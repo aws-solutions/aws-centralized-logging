@@ -1,0 +1,6 @@
+Centralized Logging
+<<<<<<< HEAD
+Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved. 
+=======
+Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved. 
+>>>>>>> 9adb9d24364237151866f632245c0339f1266882

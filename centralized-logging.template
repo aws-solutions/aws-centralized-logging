@@ -1,0 +1,1460 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "(SO0009) - AWS Centralized Logging Solution",
+	"Parameters": {
+		"KeyName": {
+			"Description": "Existing Amazon EC2 key pair for SSH access to the proxy and web servers",
+			"Type": "AWS::EC2::KeyPair::KeyName",
+			"ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+		},
+		"SSHLocation": {
+			"Description": "IP address range that can access the Nginx proxy server",
+			"Type": "String",
+			"MinLength": "9",
+			"MaxLength": "18",
+			"AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+			"ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+		},
+		"DOMAINNAME": {
+			"Description": "Name for the Amazon ES domain that this template will create.\nNote: Domain names must start with a lowercase letter and must be between 3 and 28 characters. Valid characters are a-z (lowercase only), 0-9, and – (hyphen).",
+			"Type": "String",
+			"Default": "centralized-logging"
+		},
+		"ProxyUsername": {
+			"Type": "String",
+			"Description": "User name for proxy server connection"
+		},
+		"ClusterSize": {
+      "Type": "String",
+      "Default": "Small",
+      "AllowedValues": [
+        "Small",
+        "Medium",
+        "Large"
+			],
+      "Description": "Amazon ES cluster size: small (2 data nodes), medium (4 data nodes), large (6 data nodes)"
+    },
+		"ProxyPass": {
+			"NoEcho": "true",
+			"Description": "Password for dashboard access via the proxy server\nNote: Must be six characters or longer, and must contain one uppercase letter, one lower case letter, and a special character (!@#$%^&+)",
+			"Type": "String",
+			"MinLength": "6",
+			"MaxLength": "41",
+			"AllowedPattern": "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\\S+$).{6,}$",
+			"ConstraintDescription": "Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum lenght is 6)"
+		},
+		"VPCCidrparameter": {
+			"Description": "CIDR block for VPC",
+			"Type": "String",
+			"MinLength": "9",
+			"MaxLength": "18",
+			"AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+			"Default": "10.250.0.0/16",
+			"ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+		},
+		"Subnet1Cidrparameter": {
+			"Description": "IP address range for subnet created in AZ1",
+			"Type": "String",
+			"MinLength": "9",
+			"MaxLength": "18",
+			"AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+			"Default": "10.250.250.0/24",
+			"ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+		},
+		"Subnet2Cidrparameter": {
+			"Description": "IP address range for subnet created in AZ2",
+			"Type": "String",
+			"MinLength": "9",
+			"MaxLength": "18",
+			"AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+			"Default": "10.250.249.0/24",
+			"ConstraintDescription": "must be a valid IP CIDR range of the form x.x.x.x/x."
+		},
+    "SendAnonymousData": {
+        "Description": "Anonymous Metrics Request",
+        "Type": "String",
+        "Default": "Yes",
+        "AllowedValues": [
+            "Yes",
+            "No"
+        ]
+    }
+
+
+	},
+
+	"Conditions" : {
+   "SendData" : {"Fn::Equals" : [{"Ref" : "SendAnonymousData"}, "Yes"]},
+	 "SizeSmall" : {"Fn::Equals" : [{"Ref": "ClusterSize"}, "Small"]},
+	 "SizeMedium" : {"Fn::Equals" : [{"Ref": "ClusterSize"}, "Medium"]},
+	 "SizeLarge" : {"Fn::Equals" : [{"Ref": "ClusterSize"}, "Large"]}
+  },
+
+	"Metadata": {
+		"AWS::CloudFormation::Interface" : {
+     "ParameterGroups" : [
+      {
+        "Label" : { "default" : "Proxy Configuration" },
+        "Parameters" : [  "ProxyUsername", "ProxyPass", "SSHLocation", "KeyName" ]
+      },
+			{
+				"Label" : { "default" : "Amazon ES Domain Configuration" },
+				"Parameters" : [ "DOMAINNAME", "ClusterSize" ]
+			},
+			{
+				"Label" : { "default" : "Network Settings" },
+				"Parameters" : [ "VPCCidrparameter", "Subnet1Cidrparameter", "Subnet2Cidrparameter" ]
+			},
+			{
+				"Label" : { "default" : "Anonymous Metrics Request" },
+				"Parameters" : [ "SendAnonymousData" ]
+			}
+     ],
+     "ParameterLabels" : {
+			 "SendAnonymousData" : { "default" : "Send Anonymous Usage Data" },
+      "ProxyPass" : { "default" : "Password" },
+      "ProxyUsername" : { "default" : "User Name" },
+      "DOMAINNAME" : { "default" : "Domain Name" },
+      "SSHLocation" : { "default" : "Access CIDR block" },
+      "KeyName" : { "default" : "SSH Key" },
+			"ClusterSize" : { "default" : "Cluster Size" },
+			"VPCCidrparameter" : {"default" : "VPC CIDR block" },
+			"Subnet1Cidrparameter" : { "default" : "1st Subnet Network"},
+			"Subnet2Cidrparameter" : { "default" : "2nd Subnet Network"}
+     }
+   }
+	},
+	"Mappings": {
+		"RegionMap": {
+			"us-east-1"				 : { "AMI": "ami-c481fad3" },
+			"us-west-2"        : { "AMI": "ami-b04e92d0" },
+			"eu-west-1"        : { "AMI": "ami-d41d58a7" },
+			"eu-central-1"     : { "AMI": "ami-0044b96f" },
+			"ap-southeast-1"   : { "AMI": "ami-7243e611" },
+			"ap-northeast-1"   : { "AMI": "ami-1a15c77b" },
+			"ap-northeast-2"   : { "AMI": "ami-a04297ce" },
+			"ap-southeast-2"   : { "AMI": "ami-55d4e436" }
+		},
+		"instanceSizing": {
+      "elasticsearch": {
+        "Small": "m3.large.elasticsearch",
+        "Medium": "r3.2xlarge.elasticsearch",
+        "Large": "r3.8xlarge.elasticsearch"
+      }
+    },
+		"MasterSizing": {
+			"elasticsearch": {
+				"Small": "t2.small.elasticsearch",
+				"Medium": "m3.medium.elasticsearch",
+				"Large": "m3.medium.elasticsearch"
+			}
+		},
+
+    "instanceCount": {
+      "elasticsearch": {
+        "Small": "2",
+        "Medium": "4",
+        "Large": "10"
+      }
+    },
+    "FilterPatternLookup" : {
+      "Common"          : { "Pattern" : "[host, ident, authuser, date, request, status, bytes, referrer, agent]"  },
+      "CloudTrail"      : { "Pattern" : ""   },
+      "FlowLogs"        : { "Pattern" : "[version, account_id, interface_id, srcaddr != \"-\", dstaddr != \"-\", srcport != \"-\", dstport != \"-\", protocol, packets, bytes, start, end, action, log_status]"   },
+      "Lambda"          : { "Pattern" : "[timestamp=*Z, request_id=\"*-*\", event]"   },
+      "SpaceDelimited"  : { "Pattern" : "[]"   },
+      "Other"           : { "Pattern" : ""   }
+    }
+
+	},
+	"Resources": {
+		"MyVPC": {
+			"Type": "AWS::EC2::VPC",
+			"Properties": {
+				"CidrBlock": { "Ref" : "VPCCidrparameter" },
+				"Tags" : [ { "Key" : "Name", "Value" : "centralized-logging VPC" } ]
+			}
+		},
+		"PublicSubnet": {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"VpcId": {
+					"Ref": "MyVPC"
+				},
+				"AvailabilityZone": {	"Fn::Select": [ "0", { "Fn::GetAZs": "" } ] },
+				"MapPublicIpOnLaunch": "True",
+				"CidrBlock": { "Ref" : "Subnet1Cidrparameter" },
+				"Tags" : [ { "Key" : "Name", "Value" : "centralized-logging subnet" } ]
+			}
+		},
+		"PublicSubnetB": {
+			"Type": "AWS::EC2::Subnet",
+			"Properties": {
+				"VpcId": {
+					"Ref": "MyVPC"
+				},
+				"AvailabilityZone": {	"Fn::Select": [ "1", { "Fn::GetAZs": "" } ] },
+				"MapPublicIpOnLaunch": "True",
+				"CidrBlock": { "Ref" : "Subnet2Cidrparameter" },
+				"Tags" : [ { "Key" : "Name", "Value" : "centralized-logging subnet" } ]
+			}
+		},
+
+		"InternetGateway": {
+			"Type": "AWS::EC2::InternetGateway",
+			"Properties": {}
+		},
+		"GatewayToInternet": {
+			"Type": "AWS::EC2::VPCGatewayAttachment",
+			"Properties": {
+				"VpcId": {
+					"Ref": "MyVPC"
+				},
+				"InternetGatewayId": {
+					"Ref": "InternetGateway"
+				}
+			}
+		},
+		"PublicRouteTable": {
+			"Type": "AWS::EC2::RouteTable",
+			"Properties": {
+				"VpcId": {
+					"Ref": "MyVPC"
+				}
+			}
+		},
+		"PublicRoute": {
+			"Type": "AWS::EC2::Route",
+			"DependsOn": "GatewayToInternet",
+			"Properties": {
+				"RouteTableId": {
+					"Ref": "PublicRouteTable"
+				},
+				"DestinationCidrBlock": "0.0.0.0/0",
+				"GatewayId": {
+					"Ref": "InternetGateway"
+				}
+			}
+		},
+		"PublicSubnetRouteTableAssociation": {
+			"Type": "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties": {
+				"SubnetId": {
+					"Ref": "PublicSubnet"
+				},
+				"RouteTableId": {
+					"Ref": "PublicRouteTable"
+				}
+			}
+		},
+		"PublicSubnetBRouteTableAssociation": {
+			"Type": "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties": {
+				"SubnetId": {
+					"Ref": "PublicSubnetB"
+				},
+				"RouteTableId": {
+					"Ref": "PublicRouteTable"
+				}
+			}
+		},
+
+		"ELBSecurityGroup": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupDescription": "ELB - Port 80 access",
+				"VpcId": {
+					"Ref": "MyVPC"
+				},
+				"SecurityGroupIngress": [{
+					"IpProtocol": "tcp",
+					"FromPort": "80",
+					"ToPort": "80",
+					"CidrIp": {
+						"Ref": "SSHLocation"
+					}
+				}]
+			}
+		},
+		"ELB": {
+			"Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+			"Properties": {
+				"SecurityGroups": [{
+					"Fn::GetAtt": ["ELBSecurityGroup", "GroupId"]
+				}],
+				"Subnets": [ { "Ref" : "PublicSubnet" }, {"Ref" : "PublicSubnetB" }],
+				"CrossZone": "true",
+				"Instances": [ { "Ref": "ProxyServerHost"}, { "Ref": "ProxyServerBHost" } ],
+				"LoadBalancerName": {
+					"Ref": "AWS::StackName"
+				},
+				"Listeners": [{
+					"LoadBalancerPort": "80",
+					"InstancePort": "80",
+					"Protocol": "HTTP"
+				}],
+				"HealthCheck": {
+					"Target": "TCP:80",
+					"HealthyThreshold": "3",
+					"UnhealthyThreshold": "5",
+					"Interval": "30",
+					"Timeout": "5"
+				}
+			}
+		},
+
+		"ProxyServerSecurityGroup": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupDescription": "Enable HTTP access via port 80",
+				"VpcId": {
+					"Ref": "MyVPC"
+				},
+				"SecurityGroupIngress": [{
+					"IpProtocol": "tcp",
+					"FromPort": "80",
+					"ToPort": "80",
+					"CidrIp": {
+						"Ref": "SSHLocation"
+					}
+				}, {
+					"IpProtocol" : "tcp",
+					"FromPort" : "80",
+					"ToPort" : "80",
+					"SourceSecurityGroupId" : {"Fn::GetAtt": [ "ELBSecurityGroup","GroupId" ]}
+				}]
+			}
+		},
+		"ProxyServerHost": {
+			"Type": "AWS::EC2::Instance",
+			"Metadata": {
+				"Comment": "Install nginx",
+				"AWS::CloudFormation::Init": {
+					"config": {
+						"packages": {
+							"yum": {
+								"nginx": []
+							}
+						},
+						"files": {
+							"/etc/nginx/default.d/default.conf": {
+								"content": {
+									"Fn::Join": [
+										"", [
+											"location / {\n",
+											"   auth_basic 'Restricted';\n",
+											"   auth_basic_user_file /etc/nginx/conf.d/kibana.htpasswd;\n",
+											"   proxy_pass_request_headers off;\n",
+											"   proxy_set_header Host $host;\n",
+											"   proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;\n",
+											"   proxy_pass https://", {
+												"Fn::GetAtt": [
+													"ElasticsearchAWSLogs",
+													"DomainEndpoint"
+												]
+
+											},
+											";\n",
+											"}\n"
+										]
+									]
+								},
+								"mode": "000644",
+								"owner": "root",
+								"group": "root"
+							},
+							"/etc/cfn/cfn-hup.conf": {
+								"content": {
+									"Fn::Join": [
+										"", [
+											"[main]\n",
+											"stack=", {
+												"Ref": "AWS::StackId"
+											},
+											"\n",
+											"region=", {
+												"Ref": "AWS::Region"
+											},
+											"\n"
+										]
+									]
+								},
+								"mode": "000400",
+								"owner": "root",
+								"group": "root"
+							},
+							"/etc/cfn/hooks.d/cfn-auto-reloader.conf": {
+								"content": {
+									"Fn::Join": [
+										"", [
+											"[cfn-auto-reloader-hook]\n",
+											"triggers=post.update\n",
+											"path=Resources.ProxyServerHost.Metadata.AWS::CloudFormation::Init\n",
+											"action=/opt/aws/bin/cfn-init -s ", {
+												"Ref": "AWS::StackId"
+											},
+											" -r ProxyServerHost ",
+											" --region     ", {
+												"Ref": "AWS::Region"
+											},
+											"\n",
+											"runas=root\n"
+										]
+									]
+								}
+							}
+						},
+						"services": {
+							"sysvinit": {
+								"nginx": {
+									"enabled": "true"
+								}
+							}
+						}
+					}
+				}
+			},
+			"CreationPolicy": {
+				"ResourceSignal": {
+					"Timeout": "PT10M"
+				}
+			},
+			"Properties": {
+				"ImageId": {
+					"Fn::FindInMap": [
+						"RegionMap", {
+							"Ref": "AWS::Region"
+						},
+						"AMI"
+					]
+				},
+				"NetworkInterfaces": [{
+					"GroupSet": [{
+						"Ref": "ProxyServerSecurityGroup"
+					}],
+					"AssociatePublicIpAddress": "true",
+					"DeviceIndex": "0",
+					"DeleteOnTermination": "true",
+					"SubnetId": {
+						"Ref": "PublicSubnet"
+					}
+				}],
+				"KeyName": {
+					"Ref": "KeyName"
+				},
+				"Tags" : [ {"Key" : "Name", "Value" : "Proxy Server 1 centralized-logging" } ],
+				"InstanceType": "t2.micro",
+				"UserData": {
+					"Fn::Base64": {
+						"Fn::Join": [
+							"", [
+								"#!/bin/bash -xe\n",
+
+								"# Get the latest CloudFormation package\n",
+								"yum update -y aws-cfn-bootstrap\n",
+
+								"# Start cfn-init\n",
+								"/opt/aws/bin/cfn-init -s ", {
+									"Ref": "AWS::StackId"
+								}, " -r ProxyServerHost ", " --region ", {
+									"Ref": "AWS::Region"
+								},
+								" || error_exit 'Failed to run cfn-init'\n",
+
+								"# Start up the cfn-hup daemon to listen for changes to the EC2 instance metadata\n",
+								"/opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'\n",
+
+								"# Create a new username/password for nginx\n",
+								"printf ", {
+									"Ref": "ProxyUsername"
+								},
+								":`openssl passwd -apr1 ", {
+									"Ref": "ProxyPass"
+								},
+								"` >> /etc/nginx/conf.d/kibana.htpasswd\n",
+								"# Remove the default location from nginx config\n",
+								"sed -ri '/location \\//,/.*\\}/d' /etc/nginx/nginx.conf\n",
+								"service nginx restart\n",
+
+								"# All done so signal success\n",
+								"/opt/aws/bin/cfn-signal -e $? ",
+								"         --stack ", {
+									"Ref": "AWS::StackName"
+								},
+								"         --resource ProxyServerHost ",
+								"         --region ", {
+									"Ref": "AWS::Region"
+								}, "\n"
+							]
+						]
+					}
+				}
+			}
+		},
+		"ProxyAlarm": {
+			"Type": "AWS::CloudWatch::Alarm",
+			"Properties": {
+				"AlarmDescription": "Trigger a recovery when instance status check fails for 15 consecutive minutes.",
+				"Namespace": "AWS/EC2" ,
+				"MetricName": "StatusCheckFailed_System",
+				"Statistic": "Minimum",
+				"Period": "60",
+				"EvaluationPeriods": "15",
+				"ComparisonOperator": "GreaterThanThreshold",
+				"Threshold": "0",
+				"AlarmActions": [ {"Fn::Join" : ["", ["arn:aws:automate:", { "Ref" : "AWS::Region" }, ":ec2:recover" ]]} ],
+				"Dimensions": [{"Name": "InstanceId","Value": {"Ref": "ProxyServerHost"}}]
+			}
+		},
+		"ProxyServerBHost": {
+			"Type": "AWS::EC2::Instance",
+			"Metadata": {
+				"Comment": "Install nginx",
+				"AWS::CloudFormation::Init": {
+					"config": {
+						"packages": {
+							"yum": {
+								"nginx": []
+							}
+						},
+						"files": {
+							"/etc/nginx/default.d/default.conf": {
+								"content": {
+									"Fn::Join": [
+										"", [
+											"location / {\n",
+											"   auth_basic 'Restricted';\n",
+											"   auth_basic_user_file /etc/nginx/conf.d/kibana.htpasswd;\n",
+											"   proxy_pass_request_headers off;\n",
+											"   proxy_set_header Host $host;\n",
+											"   proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;\n",
+											"   proxy_pass https://", {
+												"Fn::GetAtt": [
+													"ElasticsearchAWSLogs",
+													"DomainEndpoint"
+												]
+
+											},
+											";\n",
+											"}\n"
+										]
+									]
+								},
+								"mode": "000644",
+								"owner": "root",
+								"group": "root"
+							},
+							"/etc/cfn/cfn-hup.conf": {
+								"content": {
+									"Fn::Join": [
+										"", [
+											"[main]\n",
+											"stack=", {
+												"Ref": "AWS::StackId"
+											},
+											"\n",
+											"region=", {
+												"Ref": "AWS::Region"
+											},
+											"\n"
+										]
+									]
+								},
+								"mode": "000400",
+								"owner": "root",
+								"group": "root"
+							},
+							"/etc/cfn/hooks.d/cfn-auto-reloader.conf": {
+								"content": {
+									"Fn::Join": [
+										"", [
+											"[cfn-auto-reloader-hook]\n",
+											"triggers=post.update\n",
+											"path=Resources.ProxyServerBHost.Metadata.AWS::CloudFormation::Init\n",
+											"action=/opt/aws/bin/cfn-init -s ", {
+												"Ref": "AWS::StackId"
+											},
+											" -r ProxyServerBHost ",
+											" --region     ", {
+												"Ref": "AWS::Region"
+											},
+											"\n",
+											"runas=root\n"
+										]
+									]
+								}
+							}
+						},
+						"services": {
+							"sysvinit": {
+								"nginx": {
+									"enabled": "true"
+								}
+							}
+						}
+					}
+				}
+			},
+			"CreationPolicy": {
+				"ResourceSignal": {
+					"Timeout": "PT10M"
+				}
+			},
+			"Properties": {
+				"ImageId": {
+					"Fn::FindInMap": [
+						"RegionMap", {
+							"Ref": "AWS::Region"
+						},
+						"AMI"
+					]
+				},
+				"NetworkInterfaces": [{
+					"GroupSet": [{
+						"Ref": "ProxyServerSecurityGroup"
+					}],
+					"AssociatePublicIpAddress": "true",
+					"DeviceIndex": "0",
+					"DeleteOnTermination": "true",
+					"SubnetId": {
+						"Ref": "PublicSubnetB"
+					}
+				}],
+				"KeyName": {
+					"Ref": "KeyName"
+				},
+				"Tags" : [ {"Key" : "Name", "Value" : "Proxy Server 2 centralized-logging" } ],
+				"InstanceType": "t2.micro",
+				"UserData": {
+					"Fn::Base64": {
+						"Fn::Join": [
+							"", [
+								"#!/bin/bash -xe\n",
+
+								"# Get the latest CloudFormation package\n",
+								"yum update -y aws-cfn-bootstrap\n",
+
+								"# Start cfn-init\n",
+								"/opt/aws/bin/cfn-init -s ", {
+									"Ref": "AWS::StackId"
+								}, " -r ProxyServerBHost ", " --region ", {
+									"Ref": "AWS::Region"
+								},
+								" || error_exit 'Failed to run cfn-init'\n",
+
+								"# Start up the cfn-hup daemon to listen for changes to the EC2 instance metadata\n",
+								"/opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'\n",
+
+								"# Create a new username/password for nginx\n",
+								"printf ", {
+									"Ref": "ProxyUsername"
+								},
+								":`openssl passwd -apr1 ", {
+									"Ref": "ProxyPass"
+								},
+								"` >> /etc/nginx/conf.d/kibana.htpasswd\n",
+								"# Remove the default location from nginx config\n",
+								"sed -ri '/location \\//,/.*\\}/d' /etc/nginx/nginx.conf\n",
+								"service nginx restart\n",
+
+								"# All done so signal success\n",
+								"/opt/aws/bin/cfn-signal -e $? ",
+								"         --stack ", {
+									"Ref": "AWS::StackName"
+								},
+								"         --resource ProxyServerBHost ",
+								"         --region ", {
+									"Ref": "AWS::Region"
+								}, "\n"
+							]
+						]
+					}
+				}
+			}
+		},
+		"ProxyBAlarm": {
+			"Type": "AWS::CloudWatch::Alarm",
+			"Properties": {
+				"AlarmDescription": "Trigger a recovery when instance status check fails for 15 consecutive minutes.",
+				"Namespace": "AWS/EC2" ,
+				"MetricName": "StatusCheckFailed_System",
+				"Statistic": "Minimum",
+				"Period": "60",
+				"EvaluationPeriods": "15",
+				"ComparisonOperator": "GreaterThanThreshold",
+				"Threshold": "0",
+				"AlarmActions": [ {"Fn::Join" : ["", ["arn:aws:automate:", { "Ref" : "AWS::Region" }, ":ec2:recover" ]]} ],
+				"Dimensions": [{"Name": "InstanceId","Value": {"Ref": "ProxyServerBHost"}}]
+			}
+		},
+
+		"ProxyServerEIP": {
+			"Type": "AWS::EC2::EIP",
+			"Properties": {
+				"Domain": {
+					"Ref": "MyVPC"
+				}
+			}
+		},
+		"ProxyServerEIPAssoc": {
+			"Type": "AWS::EC2::EIPAssociation",
+			"Properties": {
+				"EIP": {
+					"Ref": "ProxyServerEIP"
+				},
+				"InstanceId": {
+					"Ref": "ProxyServerHost"
+				}
+			}
+		},
+		"ProxyServerBEIP": {
+			"Type": "AWS::EC2::EIP",
+			"Properties": {
+				"Domain": {
+					"Ref": "MyVPC"
+				}
+			}
+		},
+		"ProxyServerBEIPAssoc": {
+			"Type": "AWS::EC2::EIPAssociation",
+			"Properties": {
+				"EIP": {
+					"Ref": "ProxyServerBEIP"
+				},
+				"InstanceId": {
+					"Ref": "ProxyServerBHost"
+				}
+			}
+		},
+
+		"ElasticsearchAWSLogs": {
+			"Type": "AWS::Elasticsearch::Domain",
+			"Properties": {
+				"DomainName": { "Ref": "DOMAINNAME" },
+				"ElasticsearchVersion" : "2.3",
+				"ElasticsearchClusterConfig": {
+					"DedicatedMasterEnabled": "true",
+					"InstanceCount": { "Fn::FindInMap": [ "instanceCount", "elasticsearch", { "Ref": "ClusterSize" } ] },
+					"ZoneAwarenessEnabled": "true",
+					"InstanceType": { "Fn::FindInMap": [ "instanceSizing", "elasticsearch", { "Ref": "ClusterSize" } ] },
+					"DedicatedMasterType": { "Fn::FindInMap": [ "MasterSizing", "elasticsearch", { "Ref": "ClusterSize" } ] },
+					"DedicatedMasterCount": "3"
+				},
+				"EBSOptions": {
+					"Fn::If" : [ "SizeSmall", {
+						"EBSEnabled": true,
+						"Iops": 0,
+						"VolumeSize": 50,
+						"VolumeType": "gp2"
+					},
+				  {
+						"Fn::If" : ["SizeMedium",
+							{	"EBSEnabled": false},
+							{ "EBSEnabled": false }
+					]}]
+				},
+
+				"SnapshotOptions": {
+					"AutomatedSnapshotStartHour": "1"
+				},
+				"AccessPolicies": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Action": "es:*",
+						"Principal": {
+							"AWS": "*"
+						},
+						"Effect": "Allow",
+						"Resource": "*",
+						"Condition": {
+							"IpAddress": {
+								"aws:SourceIp": [
+									{	"Ref": "ProxyServerEIP"	}, { "Ref": "ProxyServerBEIP"}
+								]
+							}
+						}
+					}]
+				},
+				"AdvancedOptions": {
+					"rest.action.multi.allow_explicit_index": "true"
+				}
+			}
+		},
+
+		"VPCFlowLogsLogGroup": {
+			"Type": "AWS::Logs::LogGroup",
+			"Properties": {
+				"RetentionInDays": 7
+			}
+		},
+		"flowlogsRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": [
+								"vpc-flow-logs.amazonaws.com"
+							]
+						},
+						"Action": [
+							"sts:AssumeRole"
+						]
+					}]
+				},
+				"Path": "/",
+				"Policies": [{
+					"PolicyName": "LogRolePolicy",
+					"PolicyDocument": {
+						"Version": "2012-10-17",
+						"Statement": [{
+							"Effect": "Allow",
+							"Action": [
+								"logs:CreateLogGroup",
+								"logs:CreateLogStream",
+								"logs:DescribeLogGroups",
+								"logs:DescribeLogStreams",
+								"logs:PutLogEvents"
+							],
+							"Resource": "*"
+						}]
+					}
+				}]
+			}
+		},
+		"MyFlowLog": {
+			"Type": "AWS::EC2::FlowLog",
+			"Properties": {
+				"DeliverLogsPermissionArn": {
+					"Fn::GetAtt": ["flowlogsRole", "Arn"]
+				},
+				"LogGroupName": {
+					"Ref": "VPCFlowLogsLogGroup"
+				},
+				"ResourceId": {
+					"Ref": "MyVPC"
+				},
+				"ResourceType": "VPC",
+				"TrafficType": "ALL"
+			}
+		},
+
+		"TrailBucket": {
+			"DeletionPolicy": "Retain",
+			"Type": "AWS::S3::Bucket",
+			"Properties": {}
+		},
+		"TrailBucketPolicy": {
+			"Type": "AWS::S3::BucketPolicy",
+			"Properties": {
+				"Bucket": {
+					"Ref": "TrailBucket"
+				},
+				"PolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "cloudtrail.amazonaws.com"
+						},
+						"Action": "s3:GetBucketAcl",
+						"Resource": {
+							"Fn::Join": ["", ["arn:aws:s3:::", {
+								"Ref": "TrailBucket"
+							}]]
+						}
+					}, {
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "cloudtrail.amazonaws.com"
+						},
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": ["", ["arn:aws:s3:::", {
+								"Ref": "TrailBucket"
+							}, "/AWSLogs/", {
+								"Ref": "AWS::AccountId"
+							}, "/*"]]
+						},
+						"Condition": {
+							"StringEquals": {
+								"s3:x-amz-acl": "bucket-owner-full-control"
+							}
+						}
+					}]
+				}
+			}
+		},
+		"TrailLogGroup": {
+			"Type": "AWS::Logs::LogGroup",
+			"Properties": {
+				"RetentionInDays": "7"
+			}
+		},
+		"TrailLogGroupRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Version": "2012-10-17",
+					"Statement": [{
+						"Effect": "Allow",
+						"Principal": {
+							"Service": "cloudtrail.amazonaws.com"
+						},
+						"Action": "sts:AssumeRole"
+					}]
+				},
+				"Policies": [{
+					"PolicyName": "cloudtrail-policy",
+					"PolicyDocument": {
+						"Version": "2012-10-17",
+						"Statement": [{
+							"Effect": "Allow",
+							"Action": [
+								"logs:CreateLogStream"
+							],
+							"Resource": [{
+								"Fn::GetAtt": ["TrailLogGroup", "Arn"]
+							}]
+						}, {
+							"Effect": "Allow",
+							"Action": [
+								"logs:PutLogEvents"
+							],
+							"Resource": [{
+								"Fn::GetAtt": ["TrailLogGroup", "Arn"]
+							}]
+						}]
+					}
+				}]
+			}
+		},
+		"Trail": {
+			"Type": "AWS::CloudTrail::Trail",
+			"Properties": {
+				"IncludeGlobalServiceEvents": true,
+				"IsLogging": true,
+				"IsMultiRegionTrail": true,
+				"S3BucketName": { "Ref": "TrailBucket" },
+				"CloudWatchLogsLogGroupArn": {"Fn::GetAtt": ["TrailLogGroup", "Arn"]},
+				"CloudWatchLogsRoleArn": {"Fn::GetAtt": ["TrailLogGroupRole", "Arn"]}
+			},
+			"DependsOn": "TrailBucketPolicy"
+		},
+
+    "LogRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+            "AssumeRolePolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": [
+                                "ec2.amazonaws.com"
+                            ]
+                        },
+                        "Action": [
+                            "sts:AssumeRole"
+                        ]
+                    }
+                ]
+            },
+            "Path": "/",
+            "Policies": [
+                {
+                    "PolicyName": "LogRolePolicy",
+                    "PolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Effect": "Allow",
+                                "Action": [
+                                  "logs:Create*",
+                                  "logs:PutLogEvents",
+                                  "s3:GetObject"
+                                ],
+                                "Resource": [
+                                    "arn:aws:logs:*:*:*",
+                                    "arn:aws:s3:::*"
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    },
+    "LogRoleInstanceProfile": {
+        "Type": "AWS::IAM::InstanceProfile",
+        "Properties": {
+            "Path": "/",
+            "Roles": [
+                {
+                    "Ref": "LogRole"
+                }
+            ]
+        }
+    },
+
+     "LogStreamerRole": {
+			"Type": "AWS::IAM::Role",
+       "Properties": {
+         "AssumeRolePolicyDocument": {
+           "Version" : "2012-10-17",
+           "Statement": [ {
+             "Effect": "Allow",
+             "Principal": {
+               "Service": "lambda.amazonaws.com"
+             },
+             "Action": "sts:AssumeRole"
+           		} ]
+         		},
+         "Path": "/",
+           "Policies": [ {
+             "PolicyName": "My_Lambda_Function_Permissions",
+             "PolicyDocument": {
+               "Version" : "2012-10-17",
+ 	      			"Statement": [ {
+					 		  "Effect": "Allow",
+					 		  "Action": [
+					 		    "logs:CreateLogGroup",
+					 		    "logs:CreateLogStream",
+					 		    "logs:PutLogEvents"
+					 		  ],
+					 		  "Resource": {"Fn::Join" : ["", ["arn:aws:logs:",{"Ref" : "AWS::Region"},":",{ "Ref" : "AWS::AccountId" }, ":log-group:/aws/lambda/*" ]]}
+					 		}, { "Effect": "Allow", "Action": [ "es:ESHttpPost"
+					 		  ],
+ 		  				"Resource": "arn:aws:es:*:*:*"
+ 	  					}, {
+								"Effect": "Allow",
+								"Action": [
+									"cloudformation:DescribeStacks",
+									"Cloudformation:ListStackResources"
+								],
+								"Resource":{"Fn::Join" : ["", ["arn:aws:cloudformation:",{"Ref" : "AWS::Region"},":",{"Ref" :"AWS::AccountId"},"*",""]] }
+							}
+					 	     ]
+					           }
+					         } ]
+					       }
+     		 		},
+
+     "LogStreamer": {
+         "Type": "AWS::Lambda::Function",
+         "Properties": {
+             "Handler": "index.handler",
+             "Role": {
+                 "Fn::GetAtt": [
+                     "LogStreamerRole",
+                     "Arn"
+                 ]
+             },
+             "Description": "Lambda function for moving log data to AES.",
+						 "Code": {
+					 		"S3Bucket": {
+					 			"Fn::Join": [
+					 				"",
+					 				[
+					 					"solutions-",
+					 					{
+					 						"Ref": "AWS::Region"
+					 					}
+					 				]
+					 			]
+					 		},
+					 		"S3Key": "centralized-logging/v1/centralizedLoggingDownload.zip"
+					 	},
+
+             "Runtime": "nodejs",
+             "Timeout": "300"
+         }
+     },
+     "LambdaInvokePermission": {
+       "Type": "AWS::Lambda::Permission",
+       "Properties": {
+         "FunctionName" : { "Ref" : "LogStreamer" },
+         "Action": "lambda:InvokeFunction",
+         "Principal": "logs.us-east-1.amazonaws.com",
+         "SourceAccount": { "Ref" : "AWS::AccountId" }
+       }
+     },
+
+      "LogGrouptoLambdaMappingCloudTrail":{
+        "Type" : "AWS::Logs::SubscriptionFilter",
+        "DependsOn" : "LambdaInvokePermission",
+        "Properties" : {
+          "DestinationArn" : { "Fn::GetAtt" : [ "LogStreamer" , "Arn" ] },
+          "FilterPattern" : { "Fn::FindInMap" : [ "FilterPatternLookup", "CloudTrail", "Pattern" ] },
+          "LogGroupName" : { "Ref" : "TrailLogGroup" }
+        }
+      },
+      "LogGrouptoLambdaMappingFlowLogs":{
+        "Type" : "AWS::Logs::SubscriptionFilter",
+        "DependsOn" : "LambdaInvokePermission",
+        "Properties" : {
+          "DestinationArn" : { "Fn::GetAtt" : [ "LogStreamer" , "Arn" ] },
+          "FilterPattern" : { "Fn::FindInMap" : [ "FilterPatternLookup", "FlowLogs", "Pattern" ] },
+          "LogGroupName" : { "Ref" : "VPCFlowLogsLogGroup" }
+        }
+      },
+      "LogGrouptoLambdaMappingCloudwatchAgent":{
+        "Type" : "AWS::Logs::SubscriptionFilter",
+        "DependsOn" : "LambdaInvokePermission",
+        "Properties" : {
+          "DestinationArn" : { "Fn::GetAtt" : [ "LogStreamer" , "Arn" ] },
+          "FilterPattern" : { "Fn::FindInMap" : [ "FilterPatternLookup", "Common", "Pattern" ] },
+          "LogGroupName" : { "Ref" : "WebServerLogGroup" }
+        }
+			},
+
+			"WebServerSecurityGroup": {
+	      "Type": "AWS::EC2::SecurityGroup",
+	      "Properties": {
+	        "GroupDescription": "Enable HTTP access via port 80",
+	        "VpcId" : { "Ref" : "MyVPC" },
+	        "SecurityGroupIngress" : [
+	          {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : { "Ref" : "SSHLocation"}}
+		      ]
+	      }
+	    },
+			"WebServerSecurityGroupIngress": {
+				"Type": "AWS::EC2::SecurityGroupIngress",
+				"Properties": {
+					"GroupId": {
+						"Fn::GetAtt": ["WebServerSecurityGroup", "GroupId"]
+					},
+					"IpProtocol": "tcp",
+					"FromPort": "80",
+					"ToPort": "80",
+					"SourceSecurityGroupId": {
+						"Fn::GetAtt": ["ProxyServerSecurityGroup", "GroupId"]
+					}
+				}
+			},
+	    "WebServerHost": {
+	        "Type": "AWS::EC2::Instance",
+	        "Metadata": {
+	            "Comment": "Install a simple PHP application",
+	            "AWS::CloudFormation::Init": {
+	                "config": {
+	                    "packages": {
+	                        "yum": {
+	                            "httpd": [],
+	                            "php": []
+	                        }
+	                    },
+	                    "files": {
+	                        "/tmp/cwlogs/apacheaccess.conf": {
+	                            "content": {
+	                                "Fn::Join": [
+	                                    "",
+	                                    [
+	                                        "[general]\n",
+	                                        "state_file= /var/awslogs/agent-state\n",
+	                                        "[/var/log/httpd/access_log]\n",
+	                                        "file = /var/log/httpd/access_log\n",
+	                                        "log_group_name = ", {"Ref": "WebServerLogGroup"}, "\n",
+	                                        "log_stream_name = {instance_id}/apache.log\n",
+	                                        "datetime_format = %d/%b/%Y:%H:%M:%S"
+	                                    ]
+	                                ]
+	                            },
+	                            "mode": "000400",
+	                            "owner": "apache",
+	                            "group": "apache"
+	                        },
+	                        "/var/www/html/index.php": {
+	                            "content": {
+	                                "Fn::Join": [
+	                                    "",
+	                                    [
+	                                        "<?php\n",
+	                                        "echo '<h1>AWS CloudFormation sample PHP application</h1>';\n",
+	                                        "?>\n"
+	                                    ]
+	                                ]
+	                            },
+	                            "mode": "000644",
+	                            "owner": "apache",
+	                            "group": "apache"
+	                        },
+	                        "/etc/cfn/cfn-hup.conf": {
+	                            "content": {
+	                                "Fn::Join": [
+	                                    "",
+	                                    [
+	                                        "[main]\n",
+	                                        "stack=",
+	                                        {
+	                                            "Ref": "AWS::StackId"
+	                                        },
+	                                        "\n",
+	                                        "region=",
+	                                        {
+	                                            "Ref": "AWS::Region"
+	                                        },
+	                                        "\n"
+	                                    ]
+	                                ]
+	                            },
+	                            "mode": "000400",
+	                            "owner": "root",
+	                            "group": "root"
+	                        },
+	                        "/etc/cfn/hooks.d/cfn-auto-reloader.conf": {
+	                            "content": {
+	                                "Fn::Join": [
+	                                    "",
+	                                    [
+	                                        "[cfn-auto-reloader-hook]\n",
+	                                        "triggers=post.update\n",
+	                                        "path=Resources.WebServerHost.Metadata.AWS::CloudFormation::Init\n",
+	                                        "action=/opt/aws/bin/cfn-init -s ",
+	                                        {
+	                                            "Ref": "AWS::StackId"
+	                                        },
+	                                        " -r WebServerHost ",
+	                                        " --region     ",
+	                                        {
+	                                            "Ref": "AWS::Region"
+	                                        },
+	                                        "\n",
+	                                        "runas=root\n"
+	                                    ]
+	                                ]
+	                            }
+	                        }
+	                    },
+	                    "services": {
+	                        "sysvinit": {
+	                            "httpd": {
+	                                "enabled": "true",
+	                                "ensureRunning": "true"
+	                            },
+	                            "sendmail": {
+	                                "enabled": "false",
+	                                "ensureRunning": "false"
+	                            }
+	                        }
+	                    }
+	                }
+	            }
+	        },
+	        "CreationPolicy" : {
+	            "ResourceSignal" : { "Timeout" : "PT5M" }
+	        },
+	        "Properties": {
+	            "ImageId": {
+	                "Fn::FindInMap": [
+	                    "RegionMap",
+	                    {
+	                        "Ref": "AWS::Region"
+	                    },
+	                    "AMI"
+	                ]
+	            },
+							"Tags" : [ { "Key" : "Name", "Value" : "Web Server centralized-logging" } ],
+	            "NetworkInterfaces" : [{
+	              "GroupSet"                    : [{ "Ref" : "WebServerSecurityGroup"}],
+	              "AssociatePublicIpAddress"    : "true",
+	              "DeviceIndex"                 : "0",
+	              "DeleteOnTermination"         : "true",
+	              "SubnetId"                    : { "Ref" : "PublicSubnet" }
+	              }],
+	            "KeyName": {
+	                "Ref": "KeyName"
+	            },
+	            "InstanceType": "t2.micro",
+	            "IamInstanceProfile": { "Ref": "LogRoleInstanceProfile" },
+	            "UserData": {
+	                "Fn::Base64": {
+	                    "Fn::Join": [
+	                        "",
+	                        [
+	                            "#!/bin/bash -xe\n",
+
+	                            "# Get the latest CloudFormation package\n",
+	                            "yum update -y aws-cfn-bootstrap\n",
+
+	                            "# Start cfn-init\n",
+	                            "/opt/aws/bin/cfn-init -s ", { "Ref": "AWS::StackId" }, " -r WebServerHost ", " --region ", { "Ref": "AWS::Region" },
+	                            " || error_exit 'Failed to run cfn-init'\n",
+
+	                            "# Start up the cfn-hup daemon to listen for changes to the EC2 instance metadata\n",
+	                            "/opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'\n",
+
+	                            "# Get the CloudWatch Logs agent\n",
+	                            "wget https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py\n",
+
+	                            "# Install the CloudWatch Logs agent\n",
+	                            "python awslogs-agent-setup.py -n -r ", { "Ref" : "AWS::Region" }, " -c /tmp/cwlogs/apacheaccess.conf || error_exit 'Failed to run CloudWatch Logs agent setup'\n",
+
+															"# pre-warm the apache logs\n",
+															"curl 127.0.0.1\n",
+															"curl 127.0.0.1/404\n",
+
+	                            "# All done so signal success\n",
+	                            "/opt/aws/bin/cfn-signal -e $? ",
+	                            "         --stack ", { "Ref" : "AWS::StackName" },
+	                            "         --resource WebServerHost ",
+	                            "         --region ", { "Ref" : "AWS::Region" }, "\n"
+	                        ]
+	                    ]
+	                }
+	            }
+	        }
+	    },
+	    "WebServerLogGroup": {
+	        "Type": "AWS::Logs::LogGroup",
+	        "Properties": {
+	            "RetentionInDays": 7
+	        }
+	    },
+
+			"SolutionHelperRole": {
+				"Type": "AWS::IAM::Role",
+				"Properties": {
+					"AssumeRolePolicyDocument": {
+						"Version": "2012-10-17",
+						"Statement": [
+							{
+								"Effect": "Allow",
+								"Principal": {
+									"Service": "lambda.amazonaws.com"
+								},
+								"Action": "sts:AssumeRole"
+							}
+						]
+					},
+					"Path": "/",
+					"Policies": [
+						{
+							"PolicyName": "Custom_Lambda_Loader_Permissions",
+							"PolicyDocument": {
+								"Version": "2012-10-17",
+								"Statement": [
+									{
+										"Effect": "Allow",
+										"Action": [
+											"logs:CreateLogGroup",
+											"logs:CreateLogStream",
+											"logs:PutLogEvents"
+										],
+										"Resource": {"Fn::Join" : ["", ["arn:aws:logs:",{"Ref" : "AWS::Region"},":",{ "Ref" : "AWS::AccountId" }, ":log-group:/aws/lambda/*" ]]}
+									}
+								]
+							}
+						}
+					]
+				}
+			},
+			"SolutionHelper": {
+				"Type": "AWS::Lambda::Function",
+				"Properties": {
+					"Handler": "solution-helper.lambda_handler",
+					"Role": {
+						"Fn::GetAtt": [
+							"SolutionHelperRole",
+							"Arn"
+						]
+					},
+					"Description": "This function creates a CloudFormation custom lambda resource that writes parameters into DynamoDB table.",
+					"Code": {
+						"S3Bucket": {
+							"Fn::Join": [
+								"",
+								[
+									"solutions-",
+									{
+										"Ref": "AWS::Region"
+									}
+								]
+							]
+						},
+						"S3Key": "library/solution-helper/v3/solution-helper.zip"
+					},
+					"Runtime": "python2.7",
+					"Timeout": "120"
+				}
+			},
+			"SendingAnonymousData": {
+				"Type": "Custom::LoadLambda",
+				"Condition": "SendData",
+				"Properties": {
+					"ServiceToken": {
+						"Fn::GetAtt": [
+							"SolutionHelper",
+							"Arn"
+						]
+					},
+					"SendAnonymousData": {
+						"Fn::Join": [
+							"",
+							[
+								"{ 'Solution' : '",
+								"SO0009",
+								"', ",
+								"'UUID' : '",
+								{
+									"Fn::GetAtt": [
+										"CreateUniqueID",
+										"UUID"
+									]
+								},
+								"', ",
+								"'Data': {",
+								"'Size': '",
+								{
+									"Ref": "ClusterSize"
+								},
+								"'",
+								"}",
+								"}"
+							]
+						]
+					}
+				}
+			},
+			"CreateUniqueID": {
+				"Type": "Custom::LoadLambda",
+				"Properties": {
+					"ServiceToken": {
+						"Fn::GetAtt": [
+							"SolutionHelper",
+							"Arn"
+						]
+					},
+					"Region": {
+						"Ref": "AWS::Region"
+					},
+					"CreateUniqueID": "true"
+				}
+			}
+	},
+
+  "Outputs": {
+      "PublicIP": {
+          "Description": "Public IP address of the web server",
+          "Value": {
+						"Fn::Join": [ "", [ "http://", { "Fn::GetAtt": [ "WebServerHost", "PublicIp" ] } ]]
+          }
+      },
+      "KibanaURL": {
+        "Description": "URL of the initial Kibana dashboard",
+        "Value": {
+					"Fn::Join": [ "", [ "http://", {"Fn::GetAtt" : [ "ELB" , "DNSName" ]}, "/_plugin/kibana/" ]]
+      }
+		},
+			"DomainEndpoint": {
+				"Description": "URL of domain endpoint - for lambda function",
+				"Value": {
+						"Fn::GetAtt": ["ElasticsearchAWSLogs", "DomainEndpoint"]
+				}
+			}
+  }
+
+}
