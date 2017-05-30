@@ -1099,7 +1099,7 @@
       },
       "LogGrouptoLambdaMappingCloudwatchAgent":{
         "Type" : "AWS::Logs::SubscriptionFilter",
-        "DependsOn" : [ "LambdaInvokePermission", "TrailLogGroupRole", "ELB"],
+        "DependsOn" : [ "LambdaInvokePermission", "ELB"],
         "Properties" : {
           "DestinationArn" : { "Fn::GetAtt" : [ "LogStreamer" , "Arn" ] },
           "FilterPattern" : { "Fn::FindInMap" : [ "FilterPatternLookup", "Common", "Pattern" ] },
