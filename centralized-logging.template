@@ -327,6 +327,7 @@
 		},
 		"ProxyServerHost": {
 			"Type": "AWS::EC2::Instance",
+            "DependsOn" : "LambdaInvokePermission",
 			"Metadata": {
 				"Comment": "Install nginx",
 				"AWS::CloudFormation::Init": {
@@ -476,7 +477,7 @@
 								"sed -ri '/location \\//,/.*\\}/d' /etc/nginx/nginx.conf\n",
 								"service nginx restart\n",
 
-								"# All done so signal success\n",
+                                "# All done so signal success\n",
 								"/opt/aws/bin/cfn-signal -e $? ",
 								"         --stack ", {
 									"Ref": "AWS::StackName"
@@ -888,11 +889,12 @@
 			}
 		},
 		"TrailLogGroup": {
-			"Type": "AWS::Logs::LogGroup",
-			"Properties": {
-				"RetentionInDays": "7"
-			}
-		},
+            "Type": "AWS::Logs::LogGroup",
+            "DependsOn" : "LambdaInvokePermission",
+            "Properties": {
+                "RetentionInDays": "7"
+            }
+        },
 		"TrailLogGroupRole": {
 			"Type": "AWS::IAM::Role",
 			"Properties": {
@@ -1044,33 +1046,27 @@
      		 		},
 
      "LogStreamer": {
-         "Type": "AWS::Lambda::Function",
-         "Properties": {
-             "Handler": "index.handler",
-             "Role": {
-                 "Fn::GetAtt": [
-                     "LogStreamerRole",
-                     "Arn"
-                 ]
-             },
-             "Description": "Lambda function for moving log data to AES.",
-						 "Code": {
-					 		"S3Bucket": {
-					 			"Fn::Join": [
-					 				"",
-					 				[
-					 					"solutions-",
-					 					{
-					 						"Ref": "AWS::Region"
-					 					}
-					 				]
-					 			]
-					 		},
-					 		"S3Key": "centralized-logging/v1/centralizedLoggingDownload.zip"
-					 	},
-
-             "Runtime": "nodejs",
-             "Timeout": "300"
+        "Type": "AWS::Lambda::Function",
+        "Properties": {
+            "Handler": "index.handler",
+            "Role": {
+                "Fn::GetAtt": [
+                    "LogStreamerRole",
+                    "Arn"
+                ]
+            },
+            "Description": "Lambda function for moving log data to AES.",
+            "Code": {
+                "S3Bucket": { "Fn::Join" : [ "", [ "solutions-", { "Ref" : "AWS::Region"}]]},
+                "S3Key": "centralized-logging/v2/centralizedLoggingDownload.zip"
+            },
+            "Environment" : {
+                "Variables" : {
+                    "ENDPOINT" : { "Fn::GetAtt": ["ElasticsearchAWSLogs", "DomainEndpoint"] }
+                }
+            },
+            "Runtime": "nodejs6.10",
+            "Timeout": "300"
          }
      },
      "LambdaInvokePermission": {
@@ -1078,14 +1074,14 @@
        "Properties": {
          "FunctionName" : { "Ref" : "LogStreamer" },
          "Action": "lambda:InvokeFunction",
-         "Principal": "logs.us-east-1.amazonaws.com",
+         "Principal": {"Fn::Sub": "logs.${AWS::Region}.amazonaws.com"},
          "SourceAccount": { "Ref" : "AWS::AccountId" }
        }
      },
 
       "LogGrouptoLambdaMappingCloudTrail":{
         "Type" : "AWS::Logs::SubscriptionFilter",
-        "DependsOn" : "LambdaInvokePermission",
+        "DependsOn" : ["LambdaInvokePermission", "ELB"],
         "Properties" : {
           "DestinationArn" : { "Fn::GetAtt" : [ "LogStreamer" , "Arn" ] },
           "FilterPattern" : { "Fn::FindInMap" : [ "FilterPatternLookup", "CloudTrail", "Pattern" ] },
@@ -1094,7 +1090,7 @@
       },
       "LogGrouptoLambdaMappingFlowLogs":{
         "Type" : "AWS::Logs::SubscriptionFilter",
-        "DependsOn" : "LambdaInvokePermission",
+        "DependsOn" : [ "LambdaInvokePermission", "ELB"],
         "Properties" : {
           "DestinationArn" : { "Fn::GetAtt" : [ "LogStreamer" , "Arn" ] },
           "FilterPattern" : { "Fn::FindInMap" : [ "FilterPatternLookup", "FlowLogs", "Pattern" ] },
@@ -1103,7 +1099,7 @@
       },
       "LogGrouptoLambdaMappingCloudwatchAgent":{
         "Type" : "AWS::Logs::SubscriptionFilter",
-        "DependsOn" : "LambdaInvokePermission",
+        "DependsOn" : [ "LambdaInvokePermission", "ELB"],
         "Properties" : {
           "DestinationArn" : { "Fn::GetAtt" : [ "LogStreamer" , "Arn" ] },
           "FilterPattern" : { "Fn::FindInMap" : [ "FilterPatternLookup", "Common", "Pattern" ] },

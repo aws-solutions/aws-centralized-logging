@@ -1,4 +1,4 @@
-//Copyright 200<em>X</em>-200<em>X</em> Amazon.com, Inc. or its affiliates.  All Rights Reserved.  Licensed under the
+//Copyright 2016-2017 Amazon.com, Inc. or its affiliates.  All Rights Reserved.  Licensed under the
 //Amazon Software License (the "License").  You may not use this file except in compliance with the License. A copy of the
 //License is located at http://aws.amazon.com/asl or in the "license" file accompanying this file.  This file is distributed on an "AS
 //IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific
@@ -27,66 +27,48 @@ exports.handler = function(input, context) {
     stackId = stackId.substring(1, lastO);
     console.log("stackID is ", stackId);
 
-    //stackId = "tuesdayAM";
+    endpoint = process.env.ENDPOINT;
+    console.log("endpoint is ", endpoint);
 
-    var cloudformation = new AWS.CloudFormation();
-    var req = cloudformation.describeStacks({ StackName: stackId }, function(err, data) {
-        if (err) {
-            console.log("DescribeStacks call failed" + ":\n", err);
+    zlib.gunzip(zippedInput, function(error, buffer) {
+        if (error) { context.fail(error); return; }
+
+        // parse the input from JSON
+        var awslogsData = JSON.parse(buffer.toString('utf8'));
+
+        // transform the input to Elasticsearch documents
+        var elasticsearchBulkData = transform(awslogsData);
+
+        // skip control messages
+        if (!elasticsearchBulkData) {
+            console.log('Received a control message');
+            context.succeed('Control message handled successfully');
+            return;
         }
-    });
 
-    req.send(function(err, data) {
-        console.log('data from inline function', data);
-        data.Stacks[0].Outputs.forEach(function(output) {
-                if (output.OutputKey.valueOf() == "DomainEndpoint") {
-                    console.log("Found CFN endpoint = ", output.OutputValue);
-                    endpoint = output.OutputValue;
+        console.log('elasticsearchBulkData:', elasticsearchBulkData);
+
+        // post documents to the Amazon Elasticsearch Service
+        post(elasticsearchBulkData, function(error, success, statusCode, failedItems) {
+            console.log('Response: ' + JSON.stringify({
+                "statusCode": statusCode
+            }));
+
+            if (error) {
+                console.log('postElasticSearchBulkData Error: ' + JSON.stringify(error, null, 2));
+
+                if (failedItems && failedItems.length > 0) {
+                    console.log("Failed Items: " +
+                        JSON.stringify(failedItems, null, 2));
                 }
-                });
 
-            // decompress the input
-        zlib.gunzip(zippedInput, function(error, buffer) {
-            if (error) { context.fail(error); return; }
-
-            // parse the input from JSON
-            var awslogsData = JSON.parse(buffer.toString('utf8'));
-
-            // transform the input to Elasticsearch documents
-            var elasticsearchBulkData = transform(awslogsData);
-
-            // skip control messages
-            if (!elasticsearchBulkData) {
-                console.log('Received a control message');
-                context.succeed('Control message handled successfully');
-                return;
+                context.fail(JSON.stringify(error));
+            } else {
+                console.log('Success: ' + JSON.stringify(success));
+                context.succeed('Success');
             }
-
-            console.log('elasticsearchBulkData:', elasticsearchBulkData);
-
-            // post documents to the Amazon Elasticsearch Service
-            post(elasticsearchBulkData, function(error, success, statusCode, failedItems) {
-                console.log('Response: ' + JSON.stringify({
-                    "statusCode": statusCode
-                }));
-
-                if (error) {
-                    console.log('postElasticSearchBulkData Error: ' + JSON.stringify(error, null, 2));
-
-                    if (failedItems && failedItems.length > 0) {
-                        console.log("Failed Items: " +
-                            JSON.stringify(failedItems, null, 2));
-                    }
-
-                    context.fail(JSON.stringify(error));
-                } else {
-                    console.log('Success: ' + JSON.stringify(success));
-                    context.succeed('Success');
-                }
-            });
         });
     });
-
 };
 
 function transform(payload) {
