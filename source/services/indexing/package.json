@@ -1,0 +1,44 @@
+{
+  "name": "centralized-logging-indexing",
+  "description": "A Lambda function for the centralized logging indexing microservice",
+  "main": "index.js",
+  "author": {
+    "name": "aws-solutions-builder"
+  },
+  "version": "0.0.1",
+  "private": "true",
+  "dependencies": {
+    "aws-sdk": "*",
+    "https": "*",
+    "zlib": "*",
+    "crypto": "*",
+    "moment": "*"
+  },
+  "devDependencies": {
+    "chai": "*",
+    "sinon": "*",
+    "sinon-chai": "*",
+    "mocha": "*",
+    "aws-sdk-mock": "*",
+    "https": "*",
+    "npm-run-all": "*",
+    "stream": "*",
+    "istanbul": "*"
+  },
+  "scripts": {
+    "pretest": "npm install",
+    "test": "env DomainEndpoint='es_endpoint' MasterRole='master_role' SessionId='session_id' Owner='Spoke' mocha lib/*.spec.js",
+    "build-init": "rm -rf dist && rm -f archive.zip && mkdir dist && mkdir dist/lib",
+    "build:copy": "cp index.js dist/ && cp -r lib/*.js dist/lib && cp lib/basic-dashboard.json dist/lib",
+    "build:install": "cp package.json dist/ && cd dist && npm install --production",
+    "build": "npm-run-all -s build-init build:copy build:install",
+    "zip": "cd dist && zip -rq clog-indexing-service.zip .",
+    "coverage": "istanbul cover _mocha $(find ./lib -name \"*.spec.js\" -not -path \"./node_modules/*\")"
+  },
+  "bundledDependencies": [
+    "moment",
+    "crypto",
+    "zlib",
+    "https"
+  ]
+}

@@ -1,0 +1,224 @@
+# Centralized Logging Solution
+#
+# template for centralized-logging-solution
+# **DO NOT DELETE**
+#
+# author: aws-solutions-builder@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: (SO0009s) - AWS Centralized Logging Solution, spoke accounts template
+
+Parameters:
+  # Name for ES Domain
+  ESDomain:
+    Description: Elasticsearch Domain Endpoint for centralized logging
+    Type: String
+
+  # ES cluster size
+  ClusterSize:
+    Description: Amazon ES cluster size, as deployed in primary account
+    Type: String
+    Default: Small
+    AllowedValues:
+    - Small
+    - Medium
+    - Large
+
+  # Master IAM role for cross account log indexing
+  MasterRole:
+    Description: IAM Role Arn for cross account log indexing
+    Type: String
+
+  # Demo template for sample logs
+  DemoTemplate:
+    Description: Deploy demo template for sample logs?
+    Type: String
+    Default: 'No'
+    AllowedValues:
+    - 'Yes'
+    - 'No'
+
+  # VPC CIDR for sample sources
+  DemoVPC:
+    Description: CIDR for VPC with sample sources (Only required if you chose 'Yes' above)
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Default: 10.250.0.0/16
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
+
+  # Subnet for sample web server
+  DemoSubnet:
+    Description: IP address range for subnet with sample web server (Only required if you chose 'Yes' above)
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    Default: 10.250.250.0/24
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Elasticsearch Configuration
+      Parameters:
+      - ESDomain
+      - MasterRole
+      - ClusterSize
+    - Label:
+        default: Do you want to deploy sample log sources?
+      Parameters:
+      - DemoTemplate
+      - DemoVPC
+      - DemoSubnet
+    ParameterLabels:
+      ESDomain:
+        default: Elasticsearch Endpoint
+      ClusterSize:
+        default: Cluster Size
+      DemoTemplate:
+        default: Sample Logs
+      DemoVPC:
+        default: VPC CIDR for Sample Sources
+      DemoSubnet:
+        default: Subnet for Sample Web Server
+      MasterRole:
+        default: Master Account Role
+
+Mappings:
+  InstanceMap:
+    send-data: {"SendAnonymousData": "Yes"}
+
+  # Lambda source code mapping
+  SourceCode:
+    General:
+      S3Bucket: "%%BUCKET_NAME%%"
+      KeyPrefix: "centralized-logging/latest"
+
+Conditions:
+  DemoData: !Equals [!Ref DemoTemplate, 'Yes']
+
+Resources:
+  #
+  # Log Streamer and Demo resources
+  # [LogStreamerRole, LogStreamer, LogStreamerInvokePermission, DemoStack]
+  #
+  LogStreamerRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: !Sub logstreamer-${AWS::Region}
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+            - Effect: Allow
+              Action:
+              - sts:AssumeRole
+              Resource: !Sub ${MasterRole}
+
+  LogStreamer:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: Centralized Logging - Lambda function to stream logs cross account on ES Domain
+      Environment:
+        Variables:
+          DomainEndpoint: !Sub ${ESDomain}
+          MasterRole: !Sub ${MasterRole}
+          SessionId: !Sub ${AWS::AccountId}-${AWS::Region}
+          Owner: Spoke
+          Solution: SO0009s
+          ClusterSize: !Ref ClusterSize
+          UUID: !Sub ${CreateUniqueID.UUID}
+          AnonymousData: !FindInMap [InstanceMap, send-data, SendAnonymousData]
+      Handler: index.handler
+      Role: !Sub ${LogStreamerRole.Arn}
+      Code:
+        S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
+        S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-indexing-service.zip"]]
+      Runtime: nodejs6.10
+      Timeout: 300
+
+  LogStreamerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Sub ${LogStreamer}
+      Action: lambda:InvokeFunction
+      Principal: !Sub logs.${AWS::Region}.amazonaws.com
+      SourceAccount: !Sub ${AWS::AccountId}
+
+  DemoStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: DemoData
+    Properties:
+      Parameters:
+        LogStreamerArn: !Sub ${LogStreamer.Arn}
+        DemoVPCCidr: !Sub ${DemoVPC}
+        DemoSubnet: !Sub ${DemoSubnet}
+      TemplateURL: !Join ["/", ["https://s3.amazonaws.com/%%TEMPLATE_BUCKET%%", !FindInMap ["SourceCode", "General", "KeyPrefix"], "centralized-logging-demo.template"]]
+
+  #
+  # Solution Helper resources
+  # [SolutionHelperRole, SolutionHelper, SendingAnonymousData, CreateUniqueID]
+  #
+  SolutionHelperRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: Custom_Lambda_Loader_Permissions
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
+
+  SolutionHelper:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: solution-helper.lambda_handler
+      Role: !Sub ${SolutionHelperRole.Arn}
+      Description: EFS Backup - This function is a CloudFormation custom lambda resource that generates UUID for each deployment.
+      Code:
+       S3Bucket: !Sub solutions-${AWS::Region}
+       S3Key: library/solution-helper/v3/solution-helper.zip
+      Runtime: python2.7
+      Timeout: 300
+
+  CreateUniqueID:
+    Type: Custom::LoadLambda
+    Properties:
+      ServiceToken: !Sub ${SolutionHelper.Arn}
+      Region: !Sub ${AWS::Region}
+      CreateUniqueID: true
+
+Outputs:
+  LambdaArn:
+    Description: Lambda function to index logs on ES Domain
+    Value: !Sub ${LogStreamer.Arn}
