@@ -37,8 +37,8 @@ Parameters:
     Type: String
     MinLength: 6
     MaxLength: 41
-    AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
-    ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
+    # AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
+    # ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
 
   # Password confirmation for proxy server
   RetypePass:
@@ -47,8 +47,8 @@ Parameters:
     Type: String
     MinLength: 6
     MaxLength: 41
-    AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
-    ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
+    # AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
+    # ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
 
   # Demo template for sample logs
   DemoTemplate:
