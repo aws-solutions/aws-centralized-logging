@@ -161,6 +161,7 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: !Sub logs.${AWS::Region}.amazonaws.com
       SourceAccount: !Sub ${AWS::AccountId}
+      SourceArn: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*
 
   DemoStack:
     Type: AWS::CloudFormation::Stack
