@@ -190,22 +190,22 @@ Metadata:
 
 Mappings:
   InstanceMap:
-    t2.micro: {"Arch":"HVM64"}
-    us-east-1: {"instancetype":"t2.micro"}
-    us-east-2: {"instancetype":"t2.micro"}
-    us-west-1: {"instancetype":"t2.micro"}
-    us-west-2: {"instancetype":"t2.micro"}
-    ca-central-1: {"instancetype":"t2.micro"}
-    eu-west-1: {"instancetype":"t2.micro"}
-    eu-central-1: {"instancetype":"t2.micro"}
-    eu-west-2: {"instancetype":"t2.micro"}
-    eu-west-3: {"instancetype":"t2.micro"}
-    ap-southeast-1: {"instancetype":"t2.micro"}
-    ap-southeast-2: {"instancetype":"t2.micro"}
-    ap-northeast-1: {"instancetype":"t2.micro"}
-    ap-northeast-2: {"instancetype":"t2.micro"}
-    ap-south-1: {"instancetype":"t2.micro"}
-    sa-east-1: {"instancetype":"t2.micro"}
+    t2.small: {"Arch":"HVM64"}
+    us-east-1: {"instancetype":"t2.small"}
+    us-east-2: {"instancetype":"t2.small"}
+    us-west-1: {"instancetype":"t2.small"}
+    us-west-2: {"instancetype":"t2.small"}
+    ca-central-1: {"instancetype":"t2.small"}
+    eu-west-1: {"instancetype":"t2.small"}
+    eu-central-1: {"instancetype":"t2.small"}
+    eu-west-2: {"instancetype":"t2.small"}
+    eu-west-3: {"instancetype":"t2.small"}
+    ap-southeast-1: {"instancetype":"t2.small"}
+    ap-southeast-2: {"instancetype":"t2.small"}
+    ap-northeast-1: {"instancetype":"t2.small"}
+    ap-northeast-2: {"instancetype":"t2.small"}
+    ap-south-1: {"instancetype":"t2.small"}
+    sa-east-1: {"instancetype":"t2.small"}
     send-data: {"SendAnonymousData": "Yes"}
 
   InstanceSizing:
