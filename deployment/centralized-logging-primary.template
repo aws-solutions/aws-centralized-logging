@@ -345,7 +345,7 @@ Resources:
       - !Sub ${PublicSubnetB}
       LoadBalancerAttributes:
       - Key: idle_timeout.timeout_seconds
-        Value: 60
+        Value: 300
       SecurityGroups:
       - !Sub ${ALBSecurityGroup.GroupId}
       Tags:
