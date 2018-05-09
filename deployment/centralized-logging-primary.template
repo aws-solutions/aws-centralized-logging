@@ -789,7 +789,7 @@ Resources:
       EBSOptions:
         EBSEnabled: true
         Iops: 0
-        VolumeSize: 6000
+        VolumeSize: 1536
         VolumeType: "gp2"
       SnapshotOptions:
         AutomatedSnapshotStartHour: '1'
