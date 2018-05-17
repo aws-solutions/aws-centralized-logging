@@ -250,7 +250,7 @@ function post(body, callback) {
           let failedItems;
           let success;
 
-          console.log('post info:', info);
+          // console.log('post info:', info);
 
           if (response.statusCode >= 200 && response.statusCode <
             299) {
@@ -274,7 +274,9 @@ function post(body, callback) {
               "responseBody": responseBody
             } : null;
 
-          console.log('post error:', error);
+          if(error){
+            console.log('post error:', JSON.stringify(error));
+          }
 
           return callback(error, success, response.statusCode,
             failedItems);
