@@ -43,7 +43,7 @@ function handler(input, context, callback) {
 
   // Log a message to the console, you can view this text in the Monitoring tab in the Lambda console
   // or in the CloudWatch Logs console
-  console.log('Received event:', eventText);
+  // console.log('Received event:', eventText);
 
   // decode input from base64
   let zippedInput = new Buffer(input.awslogs.data, 'base64');
@@ -62,19 +62,19 @@ function handler(input, context, callback) {
 
     // skip control messages
     if (!elasticsearchBulkData) {
-      console.log('Received a control message');
+      // console.log('Received a control message');
       return callback(null, 'success');
     }
 
-    console.log('elasticsearchBulkData:', elasticsearchBulkData);
+    // console.log('elasticsearchBulkData:', elasticsearchBulkData);
 
     // post documents to the Amazon Elasticsearch Service
     post(elasticsearchBulkData, function(error, success,
       statusCode,
       failedItems) {
-      console.log('Response: ' + JSON.stringify({
-        "statusCode": statusCode
-      }));
+      // console.log('Response: ' + JSON.stringify({
+      //   "statusCode": statusCode
+      // }));
 
       if (error) {
         console.log('postElasticSearchBulkData Error: ' +
@@ -89,7 +89,7 @@ function handler(input, context, callback) {
         return callback(error);
 
       } else {
-        console.log('Success: ' + JSON.stringify(success));
+        // console.log('Success: ' + JSON.stringify(success));
 
         if (anonymousData === 'Yes') {
 
@@ -101,8 +101,8 @@ function handler(input, context, callback) {
           }, function(err, data) {
             if (err) console.log('Metrics Status: ' + JSON.stringify(
               err));
-            else console.log('Metrics Status: ' + JSON.stringify(
-              data));
+            // else console.log('Metrics Status: ' + JSON.stringify(
+            //   data));
             return callback('Success');
           });
         } else return callback('Success');
@@ -225,7 +225,7 @@ function isNumeric(n) {
  */
 function post(body, callback) {
 
-  console.log('endpoint:', endpoint);
+  // console.log('endpoint:', endpoint);
 
   assumeRole(function(err, creds) {
     if (err) {
@@ -239,7 +239,7 @@ function post(body, callback) {
         return callback(err);
       }
 
-      console.log('requestParams:', requestParams);
+      // console.log('requestParams:', requestParams);
       let request = https.request(requestParams, function(response) {
         let responseBody = '';
         response.on('data', function(chunk) {
@@ -320,7 +320,7 @@ function assumeRole(cb) {
         return cb(err, null);
       } // an error occurred
       else {
-        console.log('assume role response: ', data);
+        // console.log('assume role response: ', data);
         creds = {
           aws_secret_key: data.Credentials.SecretAccessKey,
           aws_access_key: data.Credentials.AccessKeyId,
@@ -431,7 +431,7 @@ function sendMetrics(metricData, cb) {
     }
   };
 
-  console.log('anonymous metric: ', JSON.stringify(_metric));
+  // console.log('anonymous metric: ', JSON.stringify(_metric));
 
   _metricsHelper.sendAnonymousMetric(_metric, function(err, data) {
     if (err) {
