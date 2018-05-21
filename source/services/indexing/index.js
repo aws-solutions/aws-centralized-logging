@@ -139,12 +139,12 @@ function transform(payload) {
     ].join('.');
 
     let source = buildSource(logEvent.message, logEvent.extractedFields);
-    source['@id'] = logEvent.id;
-    source['@timestamp'] = new Date(1 * logEvent.timestamp).toISOString();
-    source['@message'] = logEvent.message;
-    source['@owner'] = payload.owner;
+    // source['@id'] = logEvent.id;
+    // source['@timestamp'] = new Date(1 * logEvent.timestamp).toISOString();
+    // source['@message'] = logEvent.message;
+    // source['@owner'] = payload.owner;
     source['@log_group'] = payload.logGroup;
-    source['@log_stream'] = payload.logStream;
+    // source['@log_stream'] = payload.logStream;
 
     let action = {
       "index": {}
@@ -175,7 +175,7 @@ function buildSource(message, extractedFields) {
         let value = extractedFields[key];
 
         if (isNumeric(value)) {
-          source[key] = 1 * value;
+          // source[key] = 1 * value;
           continue;
         }
 
