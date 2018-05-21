@@ -52,3 +52,26 @@ This is also compatible with AWS however, it does not appear to be compatible wi
 profiles. Adding all of your profile information to default seems to work.
 
 you also need to install `requests-aws4auth` using pip in order to use aws credentials.
+
+# Deploying a new spoke
+
+There is a build step before you deploy this. `cd` to deployment then run:
+`./build-s3-dist.sh 1ticket-logging 1ticket-logging-us-east-1`
+
+After that you need to push the resulting templates to s3:
+`aws s3 cp ./dist/ s3://1ticket-logging/centralized-logging/latest/ --recursive --exclude "" --include ".template" --include "*.json" --acl bucket-owner-full-control --profile 1ticketlogging`
+`aws s3 cp ./dist/ s3://1ticket-logging-us-east-1/centralized-logging/latest/ --recursive --exclude "" --include ".zip" --acl bucket-owner-full-control --profile 1ticketlogging`
+
+Then use the cloudformation console to deploy the spoke template into each account.
+
+The URL of the spoke template is:
+`https://s3.amazonaws.com/1ticket-logging/centralized-logging/latest/centralized-logging-spoke.template`
+
+And the URL of the primary is:
+`https://s3.amazonaws.com/1ticket-logging/centralized-logging/latest/centralized-logging-primary.template`
+
+As of now the only way to deploy an update to a spoke is to delete the spoke
+in cloudformation and then redeploy through the console. After you redeploy
+through the console you need to go to systems manager -> parameter store and
+update the logging arns. This will require everyone in that account with loggin
+to then re deploy so their stacks use the new logging streamer.
