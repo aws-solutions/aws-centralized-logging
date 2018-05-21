@@ -433,21 +433,21 @@ function sendMetrics(metricData, cb) {
 
   // console.log('anonymous metric: ', JSON.stringify(_metric));
 
-  _metricsHelper.sendAnonymousMetric(_metric, function(err, data) {
-    if (err) {
-      let responseData = {
-        Error: 'Sending anonymous metric failed'
-      };
-      console.log([responseData.Error, ':\n', err].join(''));
-      cb(responseData, null);
-    } else {
-      let responseStatus = 'SUCCESS';
-      let responseData = {
-        Success: 'Anonymous metrics sent to AWS'
-      };
-      cb(null, responseData);
-    }
-  });
+  // _metricsHelper.sendAnonymousMetric(_metric, function(err, data) {
+  //   if (err) {
+  //     let responseData = {
+  //       Error: 'Sending anonymous metric failed'
+  //     };
+  //     console.log([responseData.Error, ':\n', err].join(''));
+  //     cb(responseData, null);
+  //   } else {
+  //     let responseStatus = 'SUCCESS';
+  //     let responseData = {
+  //       Success: 'Anonymous metrics sent to AWS'
+  //     };
+  //     cb(null, responseData);
+  //   }
+  // });
 
 }
 
