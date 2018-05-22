@@ -206,7 +206,7 @@ Mappings:
     ap-northeast-2: {"instancetype":"m5.large"}
     ap-south-1: {"instancetype":"m5.large"}
     sa-east-1: {"instancetype":"m5.large"}
-    send-data: {"SendAnonymousData": "Yes"}
+    send-data: {"SendAnonymousData": "No"}
 
   InstanceSizing:
     elasticsearch:

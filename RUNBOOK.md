@@ -73,5 +73,5 @@ And the URL of the primary is:
 As of now the only way to deploy an update to a spoke is to delete the spoke
 in cloudformation and then redeploy through the console. After you redeploy
 through the console you need to go to systems manager -> parameter store and
-update the logging arns. This will require everyone in that account with loggin
+update the logging arns. This will require everyone in that account with logging
 to then re deploy so their stacks use the new logging streamer.

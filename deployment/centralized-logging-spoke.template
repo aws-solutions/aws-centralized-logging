@@ -89,7 +89,7 @@ Metadata:
 
 Mappings:
   InstanceMap:
-    send-data: {"SendAnonymousData": "Yes"}
+    send-data: {"SendAnonymousData": "No"}
 
   # Lambda source code mapping
   SourceCode:
