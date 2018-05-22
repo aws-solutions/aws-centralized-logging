@@ -42,7 +42,7 @@ You can also set up a pattern to only take in data that contains certain fields.
 # Using curator-cli
 
 If the UI is unavailable, you can use a tool called Curator to connect.
-Instalation instructions [here](https://www.elastic.co/guide/en/elasticsearch/client/curator/current/installation.html)
+Installation instructions [here](https://www.elastic.co/guide/en/elasticsearch/client/curator/current/installation.html)
 
 With this tool you can modify, create, and delete indices. 
 To delete all indices,
@@ -59,15 +59,19 @@ There is a build step before you deploy this. `cd` to deployment then run:
 `./build-s3-dist.sh 1ticket-logging 1ticket-logging-us-east-1`
 
 After that you need to push the resulting templates to s3:
+
 `aws s3 cp ./dist/ s3://1ticket-logging/centralized-logging/latest/ --recursive --exclude "" --include ".template" --include "*.json" --acl bucket-owner-full-control --profile 1ticketlogging`
+
 `aws s3 cp ./dist/ s3://1ticket-logging-us-east-1/centralized-logging/latest/ --recursive --exclude "" --include ".zip" --acl bucket-owner-full-control --profile 1ticketlogging`
 
 Then use the cloudformation console to deploy the spoke template into each account.
 
 The URL of the spoke template is:
+
 `https://s3.amazonaws.com/1ticket-logging/centralized-logging/latest/centralized-logging-spoke.template`
 
 And the URL of the primary is:
+
 `https://s3.amazonaws.com/1ticket-logging/centralized-logging/latest/centralized-logging-primary.template`
 
 As of now the only way to deploy an update to a spoke is to delete the spoke
