@@ -139,9 +139,9 @@ function transform(payload) {
     ].join('.');
 
     let source = buildSource(logEvent.message, logEvent.extractedFields);
-    // source['@id'] = logEvent.id;
-    // source['@timestamp'] = new Date(1 * logEvent.timestamp).toISOString();
-    // source['@message'] = logEvent.message;
+    source['@id'] = logEvent.id;
+    source['@timestamp'] = new Date(1 * logEvent.timestamp).toISOString();
+    // source['@message'] = "";
     // source['@owner'] = payload.owner;
     source['@log_group'] = payload.logGroup;
     // source['@log_stream'] = payload.logStream;
@@ -431,23 +431,23 @@ function sendMetrics(metricData, cb) {
     }
   };
 
-  // console.log('anonymous metric: ', JSON.stringify(_metric));
+  console.log('anonymous metric: ', JSON.stringify(_metric));
 
-  // _metricsHelper.sendAnonymousMetric(_metric, function(err, data) {
-  //   if (err) {
-  //     let responseData = {
-  //       Error: 'Sending anonymous metric failed'
-  //     };
-  //     console.log([responseData.Error, ':\n', err].join(''));
-  //     cb(responseData, null);
-  //   } else {
-  //     let responseStatus = 'SUCCESS';
-  //     let responseData = {
-  //       Success: 'Anonymous metrics sent to AWS'
-  //     };
-  //     cb(null, responseData);
-  //   }
-  // });
+  _metricsHelper.sendAnonymousMetric(_metric, function(err, data) {
+    if (err) {
+      let responseData = {
+        Error: 'Sending anonymous metric failed'
+      };
+      console.log([responseData.Error, ':\n', err].join(''));
+      cb(responseData, null);
+    } else {
+      let responseStatus = 'SUCCESS';
+      let responseData = {
+        Success: 'Anonymous metrics sent to AWS'
+      };
+      cb(null, responseData);
+    }
+  });
 
 }
 
