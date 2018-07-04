@@ -48,6 +48,11 @@ With this tool you can modify, create, and delete indices.
 To delete all indices,
 `curator_cli delete_indices --filter_list '{"filtertype": "none"}'`
 
+Example
+```shell
+curator_cli --host https://search-centralized-logging-ejzwewbtt2vlndvvji2orm55vu.us-east-1.es.amazonaws.com delete_indices --filter_list '[{"filtertype":"age","source":"creation_date","direction":"older","unit":"days","unit_count":7}]'
+```
+
 This is also compatible with AWS however, it does not appear to be compatible with
 profiles. Adding all of your profile information to default seems to work.
 
