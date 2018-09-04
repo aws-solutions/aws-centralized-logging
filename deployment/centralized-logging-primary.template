@@ -312,7 +312,7 @@ Resources:
   #
   # Proxy EC2 resources
   # [ALBSecurityGroup, ALBListener, ApplicationLoadBalancer, ALBTargetGroup, ProxyServerSecurityGroup,
-  # ProxyAHost, ProxyBHost, ProxyAlarm, ProxyBAlarm, ProxyAEIP, ProxyAEIPAssoc, ProxyBEIP, ProxyBEIPAssoc]
+  # ProxyAHost, ProxyBHost, ProxyAAlarm, ProxyBAlarm, ProxyAEIP, ProxyAEIPAssoc, ProxyBEIP, ProxyBEIPAssoc]
   #
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -533,7 +533,7 @@ Resources:
             - !Ref 'AWS::Region'
             - |+
 
-  ProxyAlarm:
+  ProxyAAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmDescription: Trigger a recovery when instance status check fails for 15 consecutive minutes.
