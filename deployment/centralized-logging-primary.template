@@ -37,8 +37,8 @@ Parameters:
     Type: String
     MinLength: 6
     MaxLength: 41
-    AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
-    ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
+    # AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
+    # ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
 
   # Password confirmation for proxy server
   RetypePass:
@@ -47,8 +47,8 @@ Parameters:
     Type: String
     MinLength: 6
     MaxLength: 41
-    AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
-    ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
+    # AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
+    # ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
 
   # Demo template for sample logs
   DemoTemplate:
@@ -190,23 +190,23 @@ Metadata:
 
 Mappings:
   InstanceMap:
-    t2.micro: {"Arch":"HVM64"}
-    us-east-1: {"instancetype":"t2.micro"}
-    us-east-2: {"instancetype":"t2.micro"}
-    us-west-1: {"instancetype":"t2.micro"}
-    us-west-2: {"instancetype":"t2.micro"}
-    ca-central-1: {"instancetype":"t2.micro"}
-    eu-west-1: {"instancetype":"t2.micro"}
-    eu-central-1: {"instancetype":"t2.micro"}
-    eu-west-2: {"instancetype":"t2.micro"}
-    eu-west-3: {"instancetype":"t2.micro"}
-    ap-southeast-1: {"instancetype":"t2.micro"}
-    ap-southeast-2: {"instancetype":"t2.micro"}
-    ap-northeast-1: {"instancetype":"t2.micro"}
-    ap-northeast-2: {"instancetype":"t2.micro"}
-    ap-south-1: {"instancetype":"t2.micro"}
-    sa-east-1: {"instancetype":"t2.micro"}
-    send-data: {"SendAnonymousData": "Yes"}
+    m5.large: {"Arch":"HVM64"}
+    us-east-1: {"instancetype":"m5.large"}
+    us-east-2: {"instancetype":"m5.large"}
+    us-west-1: {"instancetype":"m5.large"}
+    us-west-2: {"instancetype":"m5.large"}
+    ca-central-1: {"instancetype":"m5.large"}
+    eu-west-1: {"instancetype":"m5.large"}
+    eu-central-1: {"instancetype":"m5.large"}
+    eu-west-2: {"instancetype":"m5.large"}
+    eu-west-3: {"instancetype":"m5.large"}
+    ap-southeast-1: {"instancetype":"m5.large"}
+    ap-southeast-2: {"instancetype":"m5.large"}
+    ap-northeast-1: {"instancetype":"m5.large"}
+    ap-northeast-2: {"instancetype":"m5.large"}
+    ap-south-1: {"instancetype":"m5.large"}
+    sa-east-1: {"instancetype":"m5.large"}
+    send-data: {"SendAnonymousData": "No"}
 
   InstanceSizing:
     elasticsearch:
@@ -345,7 +345,7 @@ Resources:
       - !Sub ${PublicSubnetB}
       LoadBalancerAttributes:
       - Key: idle_timeout.timeout_seconds
-        Value: 60
+        Value: 300
       SecurityGroups:
       - !Sub ${ALBSecurityGroup.GroupId}
       Tags:
@@ -789,7 +789,7 @@ Resources:
       EBSOptions:
         EBSEnabled: true
         Iops: 0
-        VolumeSize: 20
+        VolumeSize: 1536
         VolumeType: "gp2"
       SnapshotOptions:
         AutomatedSnapshotStartHour: '1'

@@ -1,0 +1,10 @@
+# ignore virtualenv and serverless stuff
+pip-selfcheck.json
+package-lock.json
+node_modules/
+lib/
+include/
+bin/
+.serverless/
+.idea/
+.Python
