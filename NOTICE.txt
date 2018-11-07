@@ -14,8 +14,6 @@ This software includes third party software subject to the following copyrights:
 
 AWS SDK under the Apache License Version 2.0
 https under the Massachusetts Institute of Technology (MIT) license
-crypto under the Massachusetts Institute of Technology (MIT) license
-zlib under the Massachusetts Institute of Technology (MIT) license
 moment under the Massachusetts Institute of Technology (MIT) license
 
 The licenses for these third party components are included in LICENSE.txt

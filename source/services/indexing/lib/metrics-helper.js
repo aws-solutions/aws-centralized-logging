@@ -18,6 +18,8 @@
 'use strict';
 
 let https = require('https');
+const LOGGER = new(require('./logger'))();
+
 
 /**
  * Helper function for sending anonymous metrics to Solutions Builder.
@@ -67,14 +69,14 @@ let metricsHelper = (function() {
     });
 
     if (metric) {
-      console.log('sending https post for metrics');
+      LOGGER.log('DEBUG','sending https post for metrics');
       request.write(JSON.stringify(metric));
     }
 
     request.end();
 
     request.on('error', (e) => {
-      console.error(e);
+      LOGGER.log('ERROR', e);
       cb(['Error occurred when sending metric request', JSON.stringify(
         e)].join(' '), null);
     });

@@ -23,6 +23,7 @@ let crypto = require('crypto');
 let AWS = require('aws-sdk');
 let moment = require('moment');
 const MetricsHelper = require('./lib/metrics-helper.js');
+const LOGGER = new(require('./lib/logger'))();
 
 const endpoint = process.env.DomainEndpoint;
 const masterRole = process.env.MasterRole;
@@ -43,7 +44,7 @@ function handler(input, context, callback) {
 
   // Log a message to the console, you can view this text in the Monitoring tab in the Lambda console
   // or in the CloudWatch Logs console
-  console.log('Received event:', eventText);
+  LOGGER.log('DEBUG', `Received event: ${eventText}`);
 
   // decode input from base64
   let zippedInput = new Buffer(input.awslogs.data, 'base64');
@@ -62,50 +63,45 @@ function handler(input, context, callback) {
 
     // skip control messages
     if (!elasticsearchBulkData) {
-      console.log('Received a control message');
+      LOGGER.log('DEBUG', `Received a control message`);
       return callback(null, 'success');
     }
-
-    console.log('elasticsearchBulkData:', elasticsearchBulkData);
+    LOGGER.log('DEBUG', `elasticsearchBulkData: ${elasticsearchBulkData}`);
 
     // post documents to the Amazon Elasticsearch Service
     post(elasticsearchBulkData, function(error, success,
       statusCode,
       failedItems) {
-      console.log('Response: ' + JSON.stringify({
-        "statusCode": statusCode
-      }));
+      LOGGER.log('DEBUG',`Response StatusCode: ${statusCode}`);
 
       if (error) {
-        console.log('postElasticSearchBulkData Error: ' +
-          JSON.stringify(
-            error, null, 2));
+        LOGGER.log('ERROR',`postElasticSearchBulkData Error: ${JSON.stringify(error, null, 2)}`);
 
         if (failedItems && failedItems.length > 0) {
-          console.log("Failed Items: " +
-            JSON.stringify(failedItems, null, 2));
+          LOGGER.log('ERROR', `Failed Items: ${JSON.stringify(failedItems, null, 2)}`);
         }
 
         return callback(error);
 
       } else {
-        console.log('Success: ' + JSON.stringify(success));
+        LOGGER.log('INFO',`success: ${JSON.stringify(success)}`);
 
         if (anonymousData === 'Yes') {
 
           //send anonymous metrics ONLY if chosen 'Yes'
+          /**
+           * V38463712 - 08/10/18 - fixing callbacks
+           */
           sendMetrics({
             'clusterSize': clusterSize,
             'itemsIndexed': success.successfulItems,
             'totalItemSize': success.totalItemSize
           }, function(err, data) {
-            if (err) console.log('Metrics Status: ' + JSON.stringify(
-              err));
-            else console.log('Metrics Status: ' + JSON.stringify(
-              data));
-            return callback('Success');
+            if (err) LOGGER.log('ERROR',`Metrics Status: ${JSON.stringify(err)}`);
+            else LOGGER.log('DEBUG',`Metrics Status: ${JSON.stringify(data)}`);
+            return callback(null, 'Success');
           });
-        } else return callback('Success');
+        } else return callback(null, 'Success');
 
 
       }
@@ -139,6 +135,14 @@ function transform(payload) {
     ].join('.');
 
     let source = buildSource(logEvent.message, logEvent.extractedFields);
+
+
+    /**
+     *  V38463712 - 10/09/2018 - Convert field to string
+     *  Fix inconsistent CloudTrail attributes & thousands of fields
+     */
+    if ('requestParameters' in source) source['requestParameters'] = JSON.stringify(source['requestParameters']);
+    if ('responseElements' in source) source['responseElements'] = JSON.stringify(source['responseElements']);
     source['@id'] = logEvent.id;
     source['@timestamp'] = new Date(1 * logEvent.timestamp).toISOString();
     source['@message'] = logEvent.message;
@@ -158,6 +162,7 @@ function transform(payload) {
       JSON.stringify(source),
     ].join('\n') + '\n';
   });
+  LOGGER.log('DEBUG',`bulkRequestBody: ${bulkRequestBody}`);
   return bulkRequestBody;
 }
 
@@ -187,6 +192,7 @@ function buildSource(message, extractedFields) {
         source[key] = value;
       }
     }
+    LOGGER.log('DEBUG',`build source output: ${source}`);
     return source;
   }
 
@@ -225,21 +231,21 @@ function isNumeric(n) {
  */
 function post(body, callback) {
 
-  console.log('endpoint:', endpoint);
+  LOGGER.log('DEBUG',`endpoint: ${endpoint}`);
 
   assumeRole(function(err, creds) {
     if (err) {
-      console.log('error in assuming role: ', err);
+      LOGGER.log('ERROR',`error in assuming role: ${err}`);
       return callback(err);
     }
 
     buildRequest(endpoint, body, creds, function(err, requestParams) {
       if (err) {
-        console.log('error in http request: ', err);
+        LOGGER.log('ERROR',`error in http request: ${err}`);
         return callback(err);
       }
 
-      console.log('requestParams:', requestParams);
+      LOGGER.log('DEBUG',`requestParams: ${requestParams}`);
       let request = https.request(requestParams, function(response) {
         let responseBody = '';
         response.on('data', function(chunk) {
@@ -250,7 +256,7 @@ function post(body, callback) {
           let failedItems;
           let success;
 
-          console.log('post info:', info);
+          LOGGER.log('INFO',`post info: ${JSON.stringify(info,null,2)}`);
 
           if (response.statusCode >= 200 && response.statusCode <
             299) {
@@ -274,7 +280,7 @@ function post(body, callback) {
               "responseBody": responseBody
             } : null;
 
-          console.log('post error:', error);
+          LOGGER.log('INFO',`post error: ${JSON.stringify(error,null,2)}`);
 
           return callback(error, success, response.statusCode,
             failedItems);
@@ -314,11 +320,11 @@ function assumeRole(cb) {
       /* required */
     }, function(err, data) {
       if (err) {
-        console.log(err);
+        LOGGER.log('ERROR',`assume role err: ${err}`);
         return cb(err, null);
       } // an error occurred
       else {
-        console.log('assume role response: ', data);
+        LOGGER.log('DEBUG',`assume role response: ${data}`);
         creds = {
           aws_secret_key: data.Credentials.SecretAccessKey,
           aws_access_key: data.Credentials.AccessKeyId,
@@ -429,14 +435,14 @@ function sendMetrics(metricData, cb) {
     }
   };
 
-  console.log('anonymous metric: ', JSON.stringify(_metric));
+  LOGGER.log('DEBUG',`anonymous metric: ${JSON.stringify(_metric)}`);
 
   _metricsHelper.sendAnonymousMetric(_metric, function(err, data) {
     if (err) {
       let responseData = {
         Error: 'Sending anonymous metric failed'
       };
-      console.log([responseData.Error, ':\n', err].join(''));
+      LOGGER.log('ERROR',`${[responseData.Error, ':\n', err].join('')}`);
       cb(responseData, null);
     } else {
       let responseStatus = 'SUCCESS';

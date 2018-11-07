@@ -1,0 +1,24 @@
+{
+  "name": "centralized-logging-auth",
+  "description": "A Lambda function for the centralized logging cognito auth",
+  "main": "index.js",
+  "author": {
+    "name": "aws-solutions-builder"
+  },
+  "version": "0.0.1",
+  "private": "true",
+  "dependencies": {
+    "aws-sdk": "*"
+  },
+  "devDependencies": {
+    "npm-run-all": "*"
+  },
+  "scripts": {
+    "pretest": "npm install",
+    "build-init": "rm -rf dist && mkdir dist",
+    "build:copy": "cp *.js dist/",
+    "build:install": "cp package.json dist/ && cd dist && npm install --production",
+    "build": "npm-run-all -s build-init build:copy build:install",
+    "zip": "cd dist && rm -f package-lock.json && zip -rq clog-auth.zip ."
+  }
+}

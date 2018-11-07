@@ -95,7 +95,7 @@ Mappings:
   SourceCode:
     General:
       S3Bucket: "%%BUCKET_NAME%%"
-      KeyPrefix: "centralized-logging/latest"
+      KeyPrefix: "centralized-logging/%%VERSION%%"
 
 Conditions:
   DemoData: !Equals [!Ref DemoTemplate, 'Yes']
@@ -138,6 +138,8 @@ Resources:
       Description: Centralized Logging - Lambda function to stream logs cross account on ES Domain
       Environment:
         Variables:
+          # V56536055 - 10/08/2018 - better logging capabilities
+          LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
           DomainEndpoint: !Sub ${ESDomain}
           MasterRole: !Sub ${MasterRole}
           SessionId: !Sub ${AWS::AccountId}-${AWS::Region}
@@ -151,7 +153,7 @@ Resources:
       Code:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-indexing-service.zip"]]
-      Runtime: nodejs6.10
+      Runtime: nodejs8.10
       Timeout: 300
 
   LogStreamerInvokePermission:

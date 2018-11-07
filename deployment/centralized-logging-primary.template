@@ -11,14 +11,24 @@ Description: (SO0009) - AWS Centralized Logging Solution, primary template
 Parameters:
   # Name for ES Domain
   DOMAINNAME:
-    Description: Name for the Amazon ES domain that this template will create. Domain names must start with a lowercase letter and must be between 3 and 28 characters. Valid characters are a-z (lowercase only), 0-9, and - (hyphen)
+    Description: Name for the Amazon ES domain that this template will create. Domain names must start with a lowercase letter and must be between 3 and 28 characters. Valid characters are a-z (lowercase only), 0-9.
     Type: String
-    Default: centralized-logging
+    Default: centralizedlogging
 
-  # Username for proxy server
-  ProxyUsername:
+  # Email address for the Elasticsearch domain admin
+  DomainAdminEmail:
+    Description: The email address of the Elasticsearch domain admin who will receive CloudWatch alarm notifications.
     Type: String
-    Description: User name for kibana proxy servers
+    Default: esdomainadmin@example.com
+    AllowedPattern: '^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
+    Description: E-mail address of the Elasticsearch admin
+
+  # Email address for Cognito Admin user
+  CognitoAdminEmail:
+    Type: String
+    Default: cognitoadmin@example.com
+    AllowedPattern: '^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
+    Description: E-mail address of the Cognito admin
 
   # ES cluster size
   ClusterSize:
@@ -29,26 +39,6 @@ Parameters:
     - Small
     - Medium
     - Large
-
-  # Password for proxy server
-  ProxyPass:
-    NoEcho: true
-    Description: Password for dashboard access via the proxy server. Must be six characters or longer, and must contain one uppercase letter, one lower case letter, and a special character (!@#$%^&+)
-    Type: String
-    MinLength: 6
-    MaxLength: 41
-    AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
-    ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
-
-  # Password confirmation for proxy server
-  RetypePass:
-    NoEcho: true
-    Description: Retype the password
-    Type: String
-    MinLength: 6
-    MaxLength: 41
-    AllowedPattern: '^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&+=])(?=\S+$).{6,}$'
-    ConstraintDescription: Must contain at least 1 Upper/Lower alphanumeric characters, number and !@#$%& (Mininum length is 6)
 
   # Demo template for sample logs
   DemoTemplate:
@@ -63,51 +53,6 @@ Parameters:
   SpokeAccounts:
     Description: Account IDs which you want to allow for centralized logging (comma separated list eg. 11111111,22222222)
     Type: CommaDelimitedList
-
-  # KeyName for proxy servers
-  KeyName:
-    Description: Existing Amazon EC2 key pair for SSH access to the proxy and web servers
-    Type: AWS::EC2::KeyPair::KeyName
-    ConstraintDescription: must be the name of an existing EC2 KeyPair.
-
-  # SSH location for proxy servers
-  SSHLocation:
-    Description: IP address range that can SSH into Nginx proxy servers
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\/([1-9]|[1-2][0-9]|3[0-2])$|^(0\.0\.0\.0\/0)$
-    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
-
-  # VPC CIDR for proxy servers
-  VPCCidrP:
-    Description: CIDR block for VPC
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
-    Default: 10.249.0.0/16
-    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
-
-  # Subnet 1 for proxy server
-  Subnet1:
-    Description: IP address range for subnet created in AZ1
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
-    Default: 10.249.250.0/24
-    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
-
-  # Subnet 2 for proxy server
-  Subnet2:
-    Description: IP address range for subnet created in AZ2
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
-    Default: 10.249.249.0/24
-    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
 
   # VPC CIDR for sample sources
   DemoVPC:
@@ -136,22 +81,13 @@ Metadata:
         default: Elasticsearch Configuration
       Parameters:
       - DOMAINNAME
+      - DomainAdminEmail
       - ClusterSize
       - SpokeAccounts
     - Label:
-        default: Kibana Proxy Configuration
+        default: Cognito Configuration
       Parameters:
-      - ProxyUsername
-      - ProxyPass
-      - RetypePass
-    - Label:
-        default: Network Configuration
-      Parameters:
-      - KeyName
-      - SSHLocation
-      - VPCCidrP
-      - Subnet1
-      - Subnet2
+      - CognitoAdminEmail
     - Label:
         default: Do you want to deploy sample log sources?
       Parameters:
@@ -159,30 +95,18 @@ Metadata:
       - DemoVPC
       - DemoSubnet
     ParameterLabels:
-      ProxyPass:
-        default: Password
-      RetypePass:
-        default: Retype Password
-      ProxyUsername:
-        default: User Name
+      CognitoAdminEmail:
+        default: Cognito Admin email address
+      DomainAdminEmail:
+        default: Elasticsearch Domain Admin email address
       DOMAINNAME:
-        default: Domain Name
+        default: Elasticsearch Domain name
       ClusterSize:
         default: Cluster Size
       DemoTemplate:
         default: Sample Logs
       SpokeAccounts:
         default: Spoke Accounts
-      KeyName:
-        default: EC2 Key Pair Name
-      SSHLocation:
-        default: SSH Access CIDR
-      VPCCidrP:
-        default: VPC CIDR for Proxy Servers
-      Subnet1:
-        default: Subnet 1 for Proxy Server
-      Subnet2:
-        default: Subnet 2 for Proxy Server
       DemoVPC:
         default: VPC CIDR for Sample Sources
       DemoSubnet:
@@ -208,535 +132,266 @@ Mappings:
     sa-east-1: {"instancetype":"t2.micro"}
     send-data: {"SendAnonymousData": "Yes"}
 
+  # V57271571 - 10/09/2018 - update tshirt size
   InstanceSizing:
     elasticsearch:
-      Small: r4.large.elasticsearch
-      Medium: r4.2xlarge.elasticsearch
-      Large: r4.4xlarge.elasticsearch
+      Small: i3.large.elasticsearch
+      Medium: i3.2xlarge.elasticsearch
+      Large: i3.4xlarge.elasticsearch
 
   MasterSizing:
     elasticsearch:
-      Small: t2.small.elasticsearch
-      Medium: r4.large.elasticsearch
-      Large: r4.xlarge.elasticsearch
+      Small: c4.large.elasticsearch
+      Medium: c4.large.elasticsearch
+      Large: c4.large.elasticsearch
 
   NodeCount:
     elasticsearch:
-      Small: '2'
-      Medium: '4'
-      Large: '10'
+      Small: '4'
+      Medium: '6'
+      Large: '6'
 
   # Lambda source code mapping
   SourceCode:
     General:
       S3Bucket: "%%BUCKET_NAME%%"
-      KeyPrefix: "centralized-logging/latest"
+      KeyPrefix: "centralized-logging/%%VERSION%%"
 
 Conditions:
   DemoData: !Equals [!Ref DemoTemplate, 'Yes']
-  PassMatch: !Equals [!Ref ProxyPass, !Ref RetypePass]
   SingleAccnt: !Equals [!Select [ 0, !Ref SpokeAccounts ], '']
 
 Resources:
   #
-  # Primer VPC resources
-  # [PrimerVPC, PublicSubnetA, PublicSubnetB, InternetGateway, GatewayAttachment,
-  # PublicRtb, PublicRoute, SubnetARtbAssoc, SubnetBRtbAssoc]
+  # Cognito and IAM
   #
-  PrimerVPC:
-    Type: AWS::EC2::VPC
+  # Creates a user pool in cognito to auth against
+  UserPool:
+    Type: 'AWS::Cognito::UserPool'
     Properties:
-      CidrBlock: !Sub ${VPCCidrP}
-      Tags:
-      - Key: Name
-        Value: centralized-logging VPC
+      UserPoolName: !Sub ${DOMAINNAME}_kibana_access
+      AutoVerifiedAttributes:
+        - email
+      MfaConfiguration: 'OFF'
+      EmailVerificationSubject: !Ref AWS::StackName
+      Schema:
+        - Name: name
+          AttributeDataType: String
+          Mutable: true
+          Required: true
+        - Name: email
+          AttributeDataType: String
+          Mutable: false
+          Required: true
 
-  PublicSubnetA:
-    Type: AWS::EC2::Subnet
+  # Creates a needed group in Cognito for Kibana access
+  UserPoolGroup:
+    Type: "AWS::Cognito::UserPoolGroup"
     Properties:
-      VpcId: !Ref PrimerVPC
-      AvailabilityZone: !Select ['0', !GetAZs '']
-      MapPublicIpOnLaunch: true
-      CidrBlock: !Sub ${Subnet1}
-      Tags:
-      - Key: Name
-        Value: centralized-logging subnet
+      Description: 'User pool group for Kibana access'
+      GroupName: !Sub ${DOMAINNAME}_kibana_access_group
+      Precedence: 0
+      UserPoolId: !Ref UserPool
 
-  PublicSubnetB:
-    Type: AWS::EC2::Subnet
+  # Creates a User Pool Client to be used by the identity pool
+  UserPoolClient:
+    Type: 'AWS::Cognito::UserPoolClient'
     Properties:
-      VpcId: !Ref PrimerVPC
-      AvailabilityZone: !Select ['1', !GetAZs '']
-      MapPublicIpOnLaunch: true
-      CidrBlock: !Sub ${Subnet2}
-      Tags:
-      - Key: Name
-        Value: centralized-logging subnet
+      ClientName: !Sub ${DOMAINNAME}-client
+      GenerateSecret: false
+      UserPoolId: !Ref UserPool
 
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties: {}
-
-  GatewayAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
+  # Creates a federated Identity pool
+  IdentityPool:
+    Type: 'AWS::Cognito::IdentityPool'
     Properties:
-      VpcId: !Ref PrimerVPC
-      InternetGatewayId: !Ref InternetGateway
+      IdentityPoolName: !Sub ${DOMAINNAME}Identity
+      AllowUnauthenticatedIdentities: true
+      CognitoIdentityProviders:
+        - ClientId: !Ref UserPoolClient
+          ProviderName: !GetAtt UserPool.ProviderName
 
-  PublicRtb:
-    Type: AWS::EC2::RouteTable
+  # Create a role for unauthorized access to AWS resources. Very limited access.
+  # Only allows users in the previously created Identity Pool
+  CognitoUnAuthorizedRole:
+    Type: 'AWS::IAM::Role'
     Properties:
-      VpcId: !Ref PrimerVPC
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Federated: 'cognito-identity.amazonaws.com'
+            Action:
+              - 'sts:AssumeRoleWithWebIdentity'
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
+              'ForAnyValue:StringLike':
+                'cognito-identity.amazonaws.com:amr': unauthenticated
+      Policies:
+        - PolicyName: 'CognitoUnauthorizedPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'mobileanalytics:PutEvents'
+                  - 'cognito-sync:BulkPublish'
+                  - 'cognito-sync:DescribeIdentityPoolUsage'
+                  - 'cognito-sync:GetBulkPublishDetails'
+                  - 'cognito-sync:GetCognitoEvents'
+                  - 'cognito-sync:GetIdentityPoolConfiguration'
+                  - 'cognito-sync:ListIdentityPoolUsage'
+                  - 'cognito-sync:SetCognitoEvents'
+                  - 'congito-sync:SetIdentityPoolConfiguration'
+                Resource: !Sub 'arn:aws:cognito-identity:${AWS::Region}:${AWS::AccountId}:identitypool/${IdentityPool}'
 
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: GatewayAttachment
+  # Create a role for authorized access to AWS resources.
+  # Only allows users in the previously created Identity Pool
+  CognitoAuthorizedRole:
+    Type: 'AWS::IAM::Role'
     Properties:
-      RouteTableId: !Sub ${PublicRtb}
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Sub ${InternetGateway}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Federated: 'cognito-identity.amazonaws.com'
+            Action:
+              - 'sts:AssumeRoleWithWebIdentity'
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
+              'ForAnyValue:StringLike':
+                'cognito-identity.amazonaws.com:amr': authenticated
+      Policies:
+        - PolicyName: 'CognitoAuthorizedPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'mobileanalytics:PutEvents'
+                  - 'cognito-sync:BulkPublish'
+                  - 'cognito-sync:DescribeIdentityPoolUsage'
+                  - 'cognito-sync:GetBulkPublishDetails'
+                  - 'cognito-sync:GetCognitoEvents'
+                  - 'cognito-sync:GetIdentityPoolConfiguration'
+                  - 'cognito-sync:ListIdentityPoolUsage'
+                  - 'cognito-sync:SetCognitoEvents'
+                  - 'congito-sync:SetIdentityPoolConfiguration'
+                  - 'cognito-identity:DeleteIdentityPool'
+                  - 'cognito-identity:DescribeIdentityPool'
+                  - 'cognito-identity:GetIdentityPoolRoles'
+                  - 'cognito-identity:GetOpenIdTokenForDeveloperIdentity'
+                  - 'cognito-identity:ListIdentities'
+                  - 'cognito-identity:LookupDeveloperIdentity'
+                  - 'cognito-identity:MergeDeveloperIdentities'
+                  - 'cognito-identity:UnlikeDeveloperIdentity'
+                  - 'cognito-identity:UpdateIdentityPool'
+                Resource: !Sub 'arn:aws:cognito-identity:${AWS::Region}:${AWS::AccountId}:identitypool/${IdentityPool}'
 
-  SubnetARtbAssoc:
-    Type: AWS::EC2::SubnetRouteTableAssociation
+  CognitoESAccessRole:
+    Type: 'AWS::IAM::Role'
     Properties:
-      SubnetId: !Sub ${PublicSubnetA}
-      RouteTableId: !Sub ${PublicRtb}
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonESCognitoAccess
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'es.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
 
-  SubnetBRtbAssoc:
-    Type: AWS::EC2::SubnetRouteTableAssociation
+  # Assigns the roles to the Identity Pool
+  IdentityPoolRoleMapping:
+    Type: 'AWS::Cognito::IdentityPoolRoleAttachment'
     Properties:
-      SubnetId: !Sub ${PublicSubnetB}
-      RouteTableId: !Sub ${PublicRtb}
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt CognitoAuthorizedRole.Arn
+        unauthenticated: !GetAtt CognitoUnAuthorizedRole.Arn
 
-
-  #
-  # Proxy EC2 resources
-  # [ALBSecurityGroup, ALBListener, ApplicationLoadBalancer, ALBTargetGroup, ProxyServerSecurityGroup,
-  # ProxyAHost, ProxyBHost, ProxyAlarm, ProxyBAlarm, ProxyAEIP, ProxyAEIPAssoc, ProxyBEIP, ProxyBEIPAssoc]
-  #
-  ALBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+  AdminUser:
+    Type: 'AWS::Cognito::UserPoolUser'
     Properties:
-      GroupDescription: ALB - Port 80 access
-      VpcId: !Ref PrimerVPC
-      SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
-        CidrIp: 0.0.0.0/0
+      DesiredDeliveryMediums:
+        - 'EMAIL'
+      UserAttributes:
+        - Name: email
+          Value: !Ref CognitoAdminEmail
+      Username: !Ref CognitoAdminEmail
+      UserPoolId: !Ref UserPool
 
-  ALBListener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
+  # Custom resource to configure Cognito and ES
+  SetupESCognito:
+    Type: 'Custom::SetupESCognito'
+    Version: 1.0
     Properties:
-      DefaultActions:
-      - Type: forward
-        TargetGroupArn: !Ref ALBTargetGroup
-      LoadBalancerArn: !Ref ApplicationLoadBalancer
-      Port: 80
-      Protocol: HTTP
+      ServiceToken: !GetAtt LambdaESCognito.Arn
+      Domain: !Ref DOMAINNAME
+      CognitoDomain: !Sub ${DOMAINNAME}-${AWS::AccountId}
+      UserPoolId: !Ref UserPool
+      IdentityPoolId: !Ref IdentityPool
+      RoleArn: !GetAtt CognitoESAccessRole.Arn
 
-  ApplicationLoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+  LambdaESCognito:
+    Type: 'AWS::Lambda::Function'
     Properties:
-      Name: !Sub ${AWS::StackName}
-      Scheme: internet-facing
-      Subnets :
-      - !Sub ${PublicSubnetA}
-      - !Sub ${PublicSubnetB}
-      LoadBalancerAttributes:
-      - Key: idle_timeout.timeout_seconds
-        Value: 60
-      SecurityGroups:
-      - !Sub ${ALBSecurityGroup.GroupId}
-      Tags:
-      - Key: Name
-        Value: !Sub ${AWS::StackName}
+      Description: Centralized Logging - Lambda function to enable cognito authentication for kibana
+      Environment:
+        Variables:
+          # V56536055 - 10/08/2018 - better logging capabilities
+          LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
+      Handler: index.handler
+      Runtime: nodejs8.10
+      Timeout: 300
+      Role: !GetAtt LambdaESCognitoRole.Arn
+      Code:
+        S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
+        S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-auth.zip"]]
 
-  ALBTargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+  LambdaESCognitoRole:
+    Type: AWS::IAM::Role
+    DependsOn: ElasticsearchAWSLogs
     Properties:
-      Name: !Sub Trg-${AWS::StackName}
-      HealthCheckIntervalSeconds: 30
-      HealthCheckPath: /
-      HealthCheckTimeoutSeconds: 5
-      Matcher:
-        HttpCode: 200-499
-      Port: 80
-      Protocol: HTTP
-      UnhealthyThresholdCount: 5
-      TargetType : instance
-      Targets :
-      - Id: !Sub ${ProxyAHost}
-        Port: 80
-      - Id: !Sub ${ProxyBHost}
-        Port: 80
-      VpcId: !Ref PrimerVPC
-
-  ProxyServerSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable HTTP/80 and SSH/22 access
-      VpcId: !Ref PrimerVPC
-      SecurityGroupIngress:
-      - IpProtocol: tcp
-        FromPort: 80
-        ToPort: 80
-        SourceSecurityGroupId: !Sub ${ALBSecurityGroup.GroupId}
-      - IpProtocol: tcp
-        FromPort: 22
-        ToPort: 22
-        CidrIp: !Sub ${SSHLocation}
-
-  ProxyAHost:
-    Type: AWS::EC2::Instance
-    Condition: PassMatch
-    Metadata:
-      Comment: Install nginx
-      AWS::CloudFormation::Init:
-        config:
-          packages:
-            yum:
-              nginx: []
-          files:
-            /etc/nginx/default.d/default.conf:
-              content: !Join
-                - ''
-                - - |
-                    location / {
-                  - |2
-                       auth_basic 'Restricted';
-                  - |2
-                       auth_basic_user_file /etc/nginx/conf.d/kibana.htpasswd;
-                  - |2
-                       proxy_http_version 1.1;
-                  - |2
-                       proxy_set_header Host $host;
-                  - |2
-                       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  - |2
-                       proxy_set_header X-Real-IP $remote_addr;
-                  - |2
-                       proxy_hide_header Authorization;
-                  - |2-
-                       proxy_set_header Authorization ""
-                    ;
-                  - '   proxy_pass https://'
-                  - !GetAtt
-                    - ElasticsearchAWSLogs
-                    - DomainEndpoint
-                  - |
-                    ;
-                  - |
-                    }
-              mode: '000644'
-              owner: root
-              group: root
-            /etc/cfn/cfn-hup.conf:
-              content: !Join
-                - ''
-                - - |
-                    [main]
-                  - stack=
-                  - !Ref 'AWS::StackId'
-                  - |+
-
-                  - region=
-                  - !Ref 'AWS::Region'
-                  - |+
-
-              mode: '000400'
-              owner: root
-              group: root
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Join
-                - ''
-                - - |
-                    [cfn-auto-reloader-hook]
-                  - |
-                    triggers=post.update
-                  - >
-                    path=Resources.ProxyAHost.Metadata.AWS::CloudFormation::Init
-                  - 'action=/opt/aws/bin/cfn-init -s '
-                  - !Ref 'AWS::StackId'
-                  - ' -r ProxyAHost '
-                  - ' --region     '
-                  - !Ref 'AWS::Region'
-                  - |+
-
-                  - |
-                    runas=root
-          services:
-            sysvinit:
-              nginx:
-                enabled: true
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT15M
-    Properties:
-      ImageId: !Sub ${AMIInfo.Id}
-      KeyName: !Sub ${KeyName}
-      NetworkInterfaces:
-      - GroupSet:
-          - !Sub ${ProxyServerSecurityGroup}
-        AssociatePublicIpAddress: true
-        DeviceIndex: 0
-        DeleteOnTermination: true
-        SubnetId: !Sub ${PublicSubnetA}
-      Tags:
-      - Key: Name
-        Value: Proxy A centralized-logging
-      InstanceType: !FindInMap [InstanceMap, !Ref "AWS::Region", "instancetype"]
-      UserData: !Base64
-        'Fn::Join':
-          - ''
-          - - |
-              #!/bin/bash -xe
-            - |
-              # Get the latest CloudFormation package
-            - |
-              yum update -y aws-cfn-bootstrap
-            - |
-              # Start cfn-init
-            - '/opt/aws/bin/cfn-init -s '
-            - !Ref 'AWS::StackId'
-            - ' -r ProxyAHost '
-            - ' --region '
-            - !Ref 'AWS::Region'
-            - |2
-               || error_exit 'Failed to run cfn-init'
-            - >
-              # Start up the cfn-hup daemon to listen for changes to the EC2
-              instance metadata
-            - |
-              /opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'
-            - |
-              # Create a new username/password for nginx
-            - 'printf '
-            - !Ref ProxyUsername
-            - ':`openssl passwd -apr1 '
-            - !Ref ProxyPass
-            - |
-              ` >> /etc/nginx/conf.d/kibana.htpasswd
-            - |
-              # Remove the default location from nginx config
-            - |
-              sed -ri '/location \//,/.*\}/d' /etc/nginx/nginx.conf
-            - |
-              service nginx restart
-            - |
-              # All done so signal success
-            - '/opt/aws/bin/cfn-signal -e $? '
-            - '         --stack '
-            - !Ref 'AWS::StackName'
-            - '         --resource ProxyAHost '
-            - '         --region '
-            - !Ref 'AWS::Region'
-            - |+
-
-  ProxyAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmDescription: Trigger a recovery when instance status check fails for 15 consecutive minutes.
-      Namespace: AWS/EC2
-      MetricName: StatusCheckFailed_System
-      Statistic: Minimum
-      Period: 60
-      EvaluationPeriods: 15
-      ComparisonOperator: GreaterThanThreshold
-      Threshold: 0
-      AlarmActions:
-      - !Sub arn:aws:automate:${AWS::Region}:ec2:recover
-      Dimensions:
-      - Name: InstanceId
-        Value: !Sub ${ProxyAHost}
-
-  ProxyBHost:
-    Type: AWS::EC2::Instance
-    Condition: PassMatch
-    Metadata:
-      Comment: Install nginx
-      AWS::CloudFormation::Init:
-        config:
-          packages:
-            yum:
-              nginx: []
-          files:
-            /etc/nginx/default.d/default.conf:
-              content: !Join
-                - ''
-                - - |
-                    location / {
-                  - |2
-                       auth_basic 'Restricted';
-                  - |2
-                       auth_basic_user_file /etc/nginx/conf.d/kibana.htpasswd;
-                  - |2
-                       proxy_http_version 1.1;
-                  - |2
-                       proxy_set_header Host $host;
-                  - |2
-                       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-                  - |2
-                       proxy_set_header X-Real-IP $remote_addr;
-                  - |2
-                       proxy_hide_header Authorization;
-                  - |2-
-                       proxy_set_header Authorization ""
-                    ;
-                  - '   proxy_pass https://'
-                  - !GetAtt
-                    - ElasticsearchAWSLogs
-                    - DomainEndpoint
-                  - |
-                    ;
-                  - |
-                    }
-              mode: '000644'
-              owner: root
-              group: root
-            /etc/cfn/cfn-hup.conf:
-              content: !Join
-                - ''
-                - - |
-                    [main]
-                  - stack=
-                  - !Ref 'AWS::StackId'
-                  - |+
-
-                  - region=
-                  - !Ref 'AWS::Region'
-                  - |+
-
-              mode: '000400'
-              owner: root
-              group: root
-            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
-              content: !Join
-                - ''
-                - - |
-                    [cfn-auto-reloader-hook]
-                  - |
-                    triggers=post.update
-                  - >
-                    path=Resources.ProxyBHost.Metadata.AWS::CloudFormation::Init
-                  - 'action=/opt/aws/bin/cfn-init -s '
-                  - !Ref 'AWS::StackId'
-                  - ' -r ProxyBHost '
-                  - ' --region     '
-                  - !Ref 'AWS::Region'
-                  - |+
-
-                  - |
-                    runas=root
-          services:
-            sysvinit:
-              nginx:
-                enabled: 'true'
-    CreationPolicy:
-      ResourceSignal:
-        Timeout: PT15M
-    Properties:
-      ImageId: !Sub ${AMIInfo.Id}
-      KeyName: !Sub ${KeyName}
-      NetworkInterfaces:
-      - GroupSet:
-          - !Sub ${ProxyServerSecurityGroup}
-        AssociatePublicIpAddress: true
-        DeviceIndex: 0
-        DeleteOnTermination: true
-        SubnetId: !Sub ${PublicSubnetB}
-      Tags:
-      - Key: Name
-        Value: Proxy B centralized-logging
-      InstanceType: !FindInMap [InstanceMap, !Ref "AWS::Region", "instancetype"]
-      UserData: !Base64
-        'Fn::Join':
-          - ''
-          - - |
-              #!/bin/bash -xe
-            - |
-              # Get the latest CloudFormation package
-            - |
-              yum update -y aws-cfn-bootstrap
-            - |
-              # Start cfn-init
-            - '/opt/aws/bin/cfn-init -s '
-            - !Ref 'AWS::StackId'
-            - ' -r ProxyBHost '
-            - ' --region '
-            - !Ref 'AWS::Region'
-            - |2
-               || error_exit 'Failed to run cfn-init'
-            - >
-              # Start up the cfn-hup daemon to listen for changes to the EC2
-              instance metadata
-            - |
-              /opt/aws/bin/cfn-hup || error_exit 'Failed to start cfn-hup'
-            - |
-              # Create a new username/password for nginx
-            - 'printf '
-            - !Ref ProxyUsername
-            - ':`openssl passwd -apr1 '
-            - !Ref ProxyPass
-            - |
-              ` >> /etc/nginx/conf.d/kibana.htpasswd
-            - |
-              # Remove the default location from nginx config
-            - |
-              sed -ri '/location \//,/.*\}/d' /etc/nginx/nginx.conf
-            - |
-              service nginx restart
-            - |
-              # All done so signal success
-            - '/opt/aws/bin/cfn-signal -e $? '
-            - '         --stack '
-            - !Ref 'AWS::StackName'
-            - '         --resource ProxyBHost '
-            - '         --region '
-            - !Ref 'AWS::Region'
-            - |+
-
-  ProxyBAlarm:
-    Type: AWS::CloudWatch::Alarm
-    Properties:
-      AlarmDescription: Trigger a recovery when instance status check fails for 15 consecutive minutes.
-      Namespace: AWS/EC2
-      MetricName: StatusCheckFailed_System
-      Statistic: Minimum
-      Period: 60
-      EvaluationPeriods: 15
-      ComparisonOperator: GreaterThanThreshold
-      Threshold: 0
-      AlarmActions:
-      - !Sub arn:aws:automate:${AWS::Region}:ec2:recover
-      Dimensions:
-      - Name: InstanceId
-        Value: !Sub ${ProxyBHost}
-
-  ProxyAEIP:
-    DependsOn: SubnetARtbAssoc
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  ProxyAEIPAssoc:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      AllocationId: !Sub ${ProxyAEIP.AllocationId}
-      InstanceId: !Sub ${ProxyAHost}
-
-  ProxyBEIP:
-    DependsOn: SubnetBRtbAssoc
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  ProxyBEIPAssoc:
-    Type: AWS::EC2::EIPAssociation
-    Properties:
-      AllocationId: !Sub ${ProxyBEIP.AllocationId}
-      InstanceId: !Sub ${ProxyBHost}
-
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+          - Effect: Allow
+            Action:
+            - es:UpdateElasticsearchDomainConfig
+            Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DOMAINNAME}'
+          - Effect: Allow
+            Action:
+            - cognito-idp:CreateUserPoolDomain
+            - cognito-idp:DeleteUserPoolDomain
+            Resource: !GetAtt UserPool.Arn
+          - Effect: Allow
+            Action:
+            - iam:PassRole
+            Resource: !GetAtt CognitoESAccessRole.Arn
 
   #
   # Primer Elasticsearch resources
@@ -776,9 +431,13 @@ Resources:
 
   ElasticsearchAWSLogs:
     Type: AWS::Elasticsearch::Domain
+    DeletionPolicy: Retain
     Properties:
       DomainName: !Ref DOMAINNAME
-      ElasticsearchVersion: 6.0
+      ElasticsearchVersion: 6.3
+      # V5804310 - 10/09/2018 - ES Encryption at rest
+      EncryptionAtRestOptions:
+        Enabled: true
       ElasticsearchClusterConfig:
         DedicatedMasterEnabled: true
         InstanceCount: !FindInMap [NodeCount, elasticsearch, !Ref ClusterSize]
@@ -786,11 +445,6 @@ Resources:
         InstanceType: !FindInMap [InstanceSizing, elasticsearch, !Ref ClusterSize]
         DedicatedMasterType: !FindInMap [MasterSizing, elasticsearch, !Ref ClusterSize]
         DedicatedMasterCount: 3
-      EBSOptions:
-        EBSEnabled: true
-        Iops: 0
-        VolumeSize: 20
-        VolumeType: "gp2"
       SnapshotOptions:
         AutomatedSnapshotStartHour: '1'
       AccessPolicies:
@@ -803,17 +457,272 @@ Resources:
           Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/* #removing domain name due to cyclic dependency
         - Action: 'es:*'
           Principal:
-            AWS: '*'
+            AWS: !Sub
+              - arn:aws:sts::${AWS::AccountId}:assumed-role/${AuthRole}/CognitoIdentityCredentials
+              - { AuthRole: !Ref CognitoAuthorizedRole }
           Effect: Allow
-          Resource: '*'
-          Condition:
-            IpAddress:
-              'aws:SourceIp':
-                - !Sub ${ProxyAEIP}
-                - !Sub ${ProxyBEIP}
+          Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DOMAINNAME}/*'
+      # V57095985 - 10/08/2018 - ES Domain needed configurations
+      # https://github.com/awslabs/aws-centralized-logging/issues/2
       AdvancedOptions:
         rest.action.multi.allow_explicit_index: 'true'
+        indices.fielddata.cache.size: 40
 
+  #
+  # SNS Topic
+  #
+  Topic:
+    Type: 'AWS::SNS::Topic'
+    Properties:
+      DisplayName: 'Centralized Logging CloudWatch alarms notification topic'
+
+  TopicPolicy:
+    Type: 'AWS::SNS::TopicPolicy'
+    Properties:
+      PolicyDocument:
+        Id: Id1
+        Version: '2012-10-17'
+        Statement:
+        - Sid: Sid1
+          Effect: Allow
+          Principal:
+            AWS: !Sub '${AWS::AccountId}' # Allow CloudWatch Alarms
+          Action: 'sns:Publish'
+          Resource: '*'
+      Topics:
+      - !Ref Topic
+
+  TopicEndpointSubscription:
+    DependsOn: TopicPolicy
+    Type: 'AWS::SNS::Subscription'
+    Properties:
+      Endpoint: !Ref DomainAdminEmail
+      Protocol: email
+      TopicArn: !Ref Topic
+
+  #
+  # CloudWatch Alarms
+  #
+
+  StatusYellowAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Replica shards for at least one index are not allocated to nodes in a cluster.'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'ClusterStatus.yellow'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 60
+      Statistic: Maximum
+      Threshold: 1
+
+  StatusRedAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Primary and replica shards of at least one index are not allocated to nodes in a cluster.'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'ClusterStatus.red'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 60
+      Statistic: Maximum
+      Threshold: 1
+
+  CPUUtilizationTooHighAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Average CPU utilization over last 45 minutes too high.'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 3
+      MetricName: 'CPUUtilization'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 900
+      Statistic: Average
+      Threshold: 80
+
+  MasterCPUUtilizationTooHighAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Average CPU utilization over last 45 minutes too high.'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 3
+      MetricName: 'MasterCPUUtilization'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 900
+      Statistic: Average
+      Threshold: 50
+
+  FreeStorageSpaceTooLowAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Cluster has less than 2GB of storage space.'
+      ComparisonOperator: LessThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'FreeStorageSpace'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 60
+      Statistic: Minimum
+      Threshold: 2000
+
+  IndexWritesBlockedTooHighAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Cluster is blocking incoming write requests.'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'ClusterIndexWritesBlocked'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 300
+      Statistic: Maximum
+      Threshold: 1
+
+  JVMMemoryPressureTooHighAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Average JVM memory pressure over last 15 minutes too high.'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'JVMMemoryPressure'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 900
+      Statistic: Average
+      Threshold: 80
+
+  MasterJVMMemoryPressureTooHighAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Average JVM memory pressure over last 15 minutes too high.'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'MasterJVMMemoryPressure'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 900
+      Statistic: Average
+      Threshold: 50
+
+  MasterNotReachableFromNodeAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'Master node stopped or not reachable. Usually the result of a network connectivity issue or AWS dependency problem.'
+      ComparisonOperator: LessThanThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'MasterReachableFromNode'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 60
+      Statistic: Minimum
+      Threshold: 1
+
+  AutomatedSnapshotFailureTooHighAlarm:
+    DependsOn: TopicEndpointSubscription
+    Type: 'AWS::CloudWatch::Alarm'
+    Properties:
+      AlarmActions:
+      - !Ref Topic
+      AlarmDescription: 'No automated snapshot was taken for the domain in the previous 36 hours (created by marbot).'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      Dimensions:
+      - Name: ClientId
+        Value: !Ref 'AWS::AccountId'
+      - Name: DomainName
+        Value: !Ref DOMAINNAME
+      EvaluationPeriods: 1
+      MetricName: 'AutomatedSnapshotFailure'
+      Namespace: 'AWS/ES'
+      OKActions:
+      - !Ref Topic
+      Period: 60
+      Statistic: Maximum
+      Threshold: 1
 
   #
   # Log Streamer and Demo resources
@@ -856,6 +765,8 @@ Resources:
       Description: Centralized Logging - Lambda function to stream logs on ES Domain
       Environment:
         Variables:
+          # V56536055 - 10/08/2018 - better logging capabilities
+          LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
           DomainEndpoint: !Sub ${ElasticsearchAWSLogs.DomainEndpoint}
           MasterRole: !Sub ${LoggingMasterRole}
           SessionId: !Sub ${AWS::AccountId}-${AWS::Region}
@@ -869,7 +780,7 @@ Resources:
       Code:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-indexing-service.zip"]]
-      Runtime: nodejs6.10
+      Runtime: nodejs8.10
       Timeout: 300
 
   LogStreamerInvokePermission:
@@ -893,27 +804,8 @@ Resources:
 
   #
   # Solution Helper resources
-  # [AMIInfoFunction, AMIInfo, SolutionHelperRole, SolutionHelper, SendingAnonymousData, CreateUniqueID]
+  # [SolutionHelperRole, SolutionHelper, SendingAnonymousData, CreateUniqueID]
   #
-  AMIInfoFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Code:
-        S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
-        S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-ami-lookup.zip"]]
-      Handler: amilookup.handler
-      Runtime: nodejs4.3
-      Timeout: 300
-      Description: This function is CloudFormation custom lambda resource that looks up the latest AMI ID.
-      Role: !Sub ${SolutionHelperRole.Arn}
-
-  AMIInfo:
-    Type: Custom::AMIInfo
-    Properties:
-      ServiceToken: !GetAtt AMIInfoFunction.Arn
-      Region: !Ref "AWS::Region"
-      Architecture: !FindInMap [InstanceMap, !FindInMap [InstanceMap, !Ref "AWS::Region", "instancetype"], "Arch"]
-
   SolutionHelperRole:
     Type: AWS::IAM::Role
     Properties:
@@ -961,17 +853,13 @@ Resources:
       CreateUniqueID: true
 
 Outputs:
-  KibanaURL:
-    Description: Kibana dashboard URL
-    Value: !Sub http://${ApplicationLoadBalancer.DNSName}/_plugin/kibana/
-
   DomainEndpoint:
     Description: ES domain endpoint URL
-    Value: !Sub ${ElasticsearchAWSLogs.DomainEndpoint}
+    Value: !Sub https://${ElasticsearchAWSLogs.DomainEndpoint}
 
-  AmiId:
-    Description: Ami Id vended in template
-    Value: !GetAtt AMIInfo.Id
+  KibanaLoginURL:
+    Description: Kibana login URL
+    Value: !Sub https://${ElasticsearchAWSLogs.DomainEndpoint}/_plugin/kibana/
 
   MasterRole:
     Description: IAM role for ES cross account access

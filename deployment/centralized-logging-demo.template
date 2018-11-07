@@ -89,7 +89,7 @@ Mappings:
   SourceCode:
     General:
       S3Bucket: "%%BUCKET_NAME%%"
-      KeyPrefix: "centralized-logging/latest"
+      KeyPrefix: "centralized-logging/%%VERSION%%"
 
 Resources:
   #
@@ -280,6 +280,13 @@ Resources:
   #
   EC2LogRole:
     Type: AWS::IAM::Role
+    ##
+    # V56617021 - 10/08/2018 - Suppress cfn_nag
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+        - id: F3
+          reason: Override the IAM role to allow logs:Create* action on its permissions policy
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -472,6 +479,13 @@ Resources:
 
   WebServerSecurityGroup:
     Type: AWS::EC2::SecurityGroup
+    ##
+    # V56617021 - 10/08/2018 - Suppress cfn_nag
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+        - id: F1000
+          reason: Override the SecurityGroup, egress rule defined as well
     Properties:
       GroupDescription: Enable HTTP access via port 80
       VpcId: !Sub ${DemoVPC}
@@ -484,6 +498,15 @@ Resources:
       FromPort: 80
       ToPort: 80
       CidrIp: 0.0.0.0/0
+
+  WebServerSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: 0
+      GroupId: !Sub ${WebServerSecurityGroup}
+      IpProtocol: tcp
+      ToPort: 65535
 
   WebServerLogtoLambda:
     Type: AWS::Logs::SubscriptionFilter
@@ -504,7 +527,7 @@ Resources:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-ami-lookup.zip"]]
       Handler: amilookup.handler
-      Runtime: nodejs4.3
+      Runtime: nodejs8.10
       Timeout: 300
       Description: This function is CloudFormation custom lambda resource that looks up the latest AMI ID.
       Role: !Sub ${SolutionHelperRole.Arn}

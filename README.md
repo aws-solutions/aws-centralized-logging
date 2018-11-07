@@ -18,20 +18,20 @@ chmod +x ./run-unit-tests.sh  \n
 ```
 export TEMPLATE_OUTPUT_BUCKET=my-bucket-name # bucket where cfn template will reside
 export DIST_OUTPUT_BUCKET=my-bucket-name # bucket where customized code will reside
+export VERSION=my-version # version number for the customized code
 ```
 _Note:_ You would have to create 2 buckets, one with prefix 'my-bucket-name' and another regional bucket with prefix 'my-bucket-name-<aws_region>'; aws_region is where you are testing the customized solution. Also, the assets  in bucket should be publicly accessible
 
 * Now build the distributable:
 ```
 chmod +x ./build-s3-dist.sh \n
-./build-s3-dist.sh $DIST_OUTPUT_BUCKET $TEMPLATE_OUTPUT_BUCKET \n
+./build-s3-dist.sh $DIST_OUTPUT_BUCKET $TEMPLATE_OUTPUT_BUCKET $VERSION \n
 ```
 
 * Deploy the distributable to an Amazon S3 bucket in your account. _Note:_ you must have the AWS Command Line Interface installed.
-
 ```
-aws s3 cp ./dist/ s3://my-bucket-name/centralized-logging/latest/ --recursive --exclude "*" --include "*.template" --include "*.json" --acl bucket-owner-full-control --profile aws-cred-profile-name \n
-aws s3 cp ./dist/ s3://my-bucket-name-<aws_region>/centralized-logging/latest/ --recursive --exclude "*" --include "*.zip" --acl bucket-owner-full-control --profile aws-cred-profile-name \n
+aws s3 cp ./dist/ s3://my-bucket-name/centralized-logging/<my-version>/ --recursive --exclude "*" --include "*.template" --include "*.json" --acl bucket-owner-full-control --profile aws-cred-profile-name \n
+aws s3 cp ./dist/ s3://my-bucket-name-<aws_region>/centralized-logging/<my-version>/ --recursive --exclude "*" --include "*.zip" --acl bucket-owner-full-control --profile aws-cred-profile-name \n
 ```
 
 * Get the link of the centralized-logging-primary.template uploaded to your Amazon S3 bucket.
@@ -40,17 +40,31 @@ aws s3 cp ./dist/ s3://my-bucket-name-<aws_region>/centralized-logging/latest/ -
 ## File Structure
 The AWS Centralized Logging Solution project consists of indexing microservices which is deployed to a serverless environment in AWS Lambda.
 
-<pre>
+```
 |-source/
   |-services/
     |-indexing/      [ microservice for indexing logs on ES domain ]
       |-lib/
         |-[ service module unit tests ]
         |-basic-dashboard.json [ sample dashboard for kibana ]
+        |-logger.js [ logger class ]
         |-metrics-helper.js [ helper module for sending anonymous metrics ]
       |-index.js [ injection point for microservice ]
       |-package.json
-</pre>
+    |-auth/      [ microservice for enabling Cognito auth ]
+      |-index.js [ injection point for microservice ]
+      |-logger.js [ logger class ]
+      |-package.json
+```
+***
+
+## v2.2.0 changes
+```
+* Amazon Cognito integration for user login
+* Elasticsearch version update to 6.3
+* Elasticsearch encryption at rest
+* T-shirt sizing update
+```
 
 ***
 
