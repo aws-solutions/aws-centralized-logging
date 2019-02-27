@@ -17,7 +17,6 @@ Parameters:
 
   # Email address for the Elasticsearch domain admin
   DomainAdminEmail:
-    Description: The email address of the Elasticsearch domain admin who will receive CloudWatch alarm notifications.
     Type: String
     Default: esdomainadmin@example.com
     AllowedPattern: '^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
