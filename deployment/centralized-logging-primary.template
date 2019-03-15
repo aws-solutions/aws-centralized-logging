@@ -32,7 +32,7 @@ Parameters:
 
   # ES cluster size
   ClusterSize:
-    Description: Amazon ES cluster size; small (2 data nodes), medium (4 data nodes), large (10 data nodes)
+    Description: Amazon ES cluster size; small (4 data nodes), medium (6 data nodes), large (6 data nodes)
     Type: String
     Default: Small
     AllowedValues:
