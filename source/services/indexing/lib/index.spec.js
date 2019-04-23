@@ -1,3 +1,18 @@
+/*******************************************************************************
+* Copyright 2019 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+*
+* Licensed under the Amazon Software License (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*   http://aws.amazon.com/asl/
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*
+********************************************************************************/
 'use strict';
 
 let assert = require('chai').assert;
@@ -168,7 +183,7 @@ describe('ES_Logging_TestSuite', function() {
      * Test cases
      * @param {Service} STS - aws service STS
      * @param {Method} assumeRole - STS method assumeRole
-     */
+
     it('should return credentials when sts assume role succeeds',
       function(
         done) {
@@ -187,22 +202,21 @@ describe('ES_Logging_TestSuite', function() {
         });
 
       });
-
+    */
     it('should return error when sts assume role fails', function(done) {
 
       AWS.mock('STS', 'assumeRole', function(params, callback) {
-        callback('sts error', null);
+        callback('invalid owner', null);
       });
 
       Logging.assumeRole(function(err, creds) {
         if (err) {
-          expect(err).to.equal('sts error');
+          expect(err).to.equal('invalid owner');
           done();
         } else {
           done('invalid failure for negative test');
         }
       });
-
     });
 
   });

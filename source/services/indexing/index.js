@@ -1,16 +1,18 @@
-/*********************************************************************************************************************
- *  Copyright 2016 Amazon.com, Inc. or its affiliates. All Rights Reserved.                                           *
- *                                                                                                                    *
- *  Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance        *
- *  with the License. A copy of the License is located at                                                             *
- *                                                                                                                    *
- *      http://aws.amazon.com/asl/                                                                                    *
- *                                                                                                                    *
- *  or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES *
- *  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions    *
- *  and limitations under the License.                                                                                *
- *********************************************************************************************************************/
-
+/*******************************************************************************
+* Copyright 2019 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+*
+* Licensed under the Amazon Software License (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*   http://aws.amazon.com/asl/
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*
+********************************************************************************/
 /**
  * @author Solution Builders
  */
@@ -25,22 +27,24 @@ let moment = require('moment');
 const MetricsHelper = require('./lib/metrics-helper.js');
 const LOGGER = new(require('./lib/logger'))();
 
-const endpoint = process.env.DomainEndpoint;
-const masterRole = process.env.MasterRole;
-const sessionId = process.env.SessionId;
-const owner = process.env.Owner;
-const solution = process.env.Solution;
-const clusterSize = process.env.ClusterSize;
+const endpoint = process.env.DOMAIN_ENDPOINT;
+const masterRole = process.env.MASTER_ROLE;
+const sessionId = process.env.SESSION_ID;
+const owner = process.env.OWNER;
+const solution = process.env.SOLUTION;
+const clusterSize = process.env.CLUSTER_SIZE;
 const uuid = process.env.UUID;
-const anonymousData = process.env.AnonymousData;
+const anonymousData = process.env.ANONYMOUS_DATA;
 
 function handler(input, context, callback) {
 
   let eventText = JSON.stringify(input, null, 2);
 
   //return callback if environment variable not set
-  if (!endpoint || !masterRole || !sessionId || !owner) return callback(
-    'environment variables not defined');
+  if (!endpoint || !masterRole || !sessionId || !owner) {
+    LOGGER.log('ERROR', `check environment variables endpoint: ${endpoint}, masterRole: ${masterRole}, sessionId: ${sessionId}, owner: ${owner}`);
+    return callback('environment variables not defined');
+  }
 
   // Log a message to the console, you can view this text in the Monitoring tab in the Lambda console
   // or in the CloudWatch Logs console

@@ -11,11 +11,11 @@
     "node": ">=6.10"
   },
   "dependencies": {
-    "aws-sdk": "*",
     "https": "*",
     "moment": "*"
   },
   "devDependencies": {
+    "aws-sdk": "*",
     "chai": "*",
     "sinon": "*",
     "sinon-chai": "*",

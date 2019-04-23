@@ -1,79 +1,81 @@
+/*******************************************************************************
+* Copyright 2019 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+*
+* Licensed under the Amazon Software License (the "License").
+* You may not use this file except in compliance with the License.
+* A copy of the License is located at
+*
+*   http://aws.amazon.com/asl/
+*
+* or in the "license" file accompanying this file. This file is distributed
+* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+* express or implied. See the License for the specific language governing
+* permissions and limitations under the License.
+*
+********************************************************************************/
 'use strict';
-
 /**
 * A Lambda function that creates a Cognito User Pool domain
 * and updates an Elasticsearch Domain config for Cognito Authentication
 **/
 
-var AWS = require("aws-sdk");
+const AWS = require("aws-sdk");
+const uuid = require("uuid");
 const LOGGER = new(require('./logger'))();
 
 exports.handler = function(event, context) {
 
     LOGGER.log('DEBUG',`REQUEST RECEIVED: ${JSON.stringify(event,null,2)}`);
-
     const cognitoidentityserviceprovider = new AWS.CognitoIdentityServiceProvider();
     const es = new AWS.ES();
+    let responseData = {};
 
-    if (event.RequestType == "Delete") {
-        let responseStatus = "FAILED";
-        let responseData = {};
-        // For Delete requests, delete the domain on the Cognito User Pool
-        let params = {
-            Domain: event.ResourceProperties.CognitoDomain,
-            UserPoolId: event.ResourceProperties.UserPoolId
-        };
-        cognitoidentityserviceprovider.deleteUserPoolDomain(params, function(err, data) {
-            if (err) {
-                LOGGER.log('ERROR',`error deleting domain on Cognito User Pool: ${err.stack}`);
-                sendResponse(event, context, responseStatus, responseData);
-            }
-            else {
-                LOGGER.log('DEBUG',`SUCCESS deleting domain on Cognito User Pool: ${data}`);
-                responseStatus = "SUCCESS";
-                sendResponse(event, context, responseStatus, responseData);
-            }
-        });
+    if (event.RequestType == "Delete" || event.RequestType == "Update" ) {
+        sendResponse(event, context, "SUCCESS", responseData);
     }
     else if (event.RequestType == "Create") {
-        let responseStatus = "FAILED";
-        let responseData = {};
-        //create a domain for a provided Cognito User Pool
-        let params = {
-            Domain: event.ResourceProperties.CognitoDomain,
-            UserPoolId: event.ResourceProperties.UserPoolId
-        };
-        cognitoidentityserviceprovider.createUserPoolDomain(params, function(err, data) {
-            if (err) {
-                LOGGER.log('ERROR',`error creating domain on Cognito User Pool: ${err.stack}`);
-                responseStatus = "FAILED";
-                sendResponse(event, context, responseStatus, responseData);
-            }
-            else {
-                //update the ES domain config for Cognito Auth
-                LOGGER.log('INFO',"Cognito User Pool Domain Create SUCCEEDED");
-                let params = {
-                    DomainName: event.ResourceProperties.Domain,
-                    CognitoOptions: {
-                        Enabled: true,
-                        IdentityPoolId: event.ResourceProperties.IdentityPoolId,
-                        RoleArn: event.ResourceProperties.RoleArn,
-                        UserPoolId: event.ResourceProperties.UserPoolId
-                    }
-                };
-                es.updateElasticsearchDomainConfig(params, function(err, data) {
-                    if (err) {
-                        LOGGER.log('ERROR',`error updating the Elasticsearch domain config: ${err.stack}`);
-                        sendResponse(event, context, responseStatus, responseData);
-                    }
-                    else {
-                        LOGGER.log('INFO',"Elasticsearch domain config update SUCCEEDED");
-                        responseStatus = "SUCCESS";
-                        sendResponse(event, context, responseStatus, responseData);
-                    }
-                });
-            }
-        });
+
+        if (event.ResourceProperties.Resource === "UUID") {
+          responseData = {UUID: uuid.v4()};
+          sendResponse(event, context, "SUCCESS", responseData);
+        }
+        else {
+          //create a domain for a provided Cognito User Pool
+          let params = {
+              Domain: event.ResourceProperties.CognitoDomain,
+              UserPoolId: event.ResourceProperties.UserPoolId
+          };
+          cognitoidentityserviceprovider.createUserPoolDomain(params, function(err, data) {
+              if (err) {
+                  LOGGER.log('ERROR',`error creating domain on Cognito User Pool: ${err.stack}`);
+                  sendResponse(event, context, "FAILED", responseData);
+              }
+              else {
+                  //update the ES domain config for Cognito Auth
+                  LOGGER.log('INFO',"Cognito User Pool Domain Create SUCCEEDED");
+                  let params = {
+                      DomainName: event.ResourceProperties.Domain,
+                      CognitoOptions: {
+                          Enabled: true,
+                          IdentityPoolId: event.ResourceProperties.IdentityPoolId,
+                          RoleArn: event.ResourceProperties.RoleArn,
+                          UserPoolId: event.ResourceProperties.UserPoolId
+                      }
+                  };
+                  es.updateElasticsearchDomainConfig(params, function(err, data) {
+                      if (err) {
+                          LOGGER.log('ERROR',`error updating the Elasticsearch domain config: ${err.stack}`);
+                          sendResponse(event, context, "FAILED", responseData);
+                      }
+                      else {
+                          LOGGER.log('INFO',"Elasticsearch domain config update SUCCEEDED");
+                          sendResponse(event, context, "SUCCESS", responseData);
+                      }
+                  });
+              }
+          });
+
+        }
     }
 };
 

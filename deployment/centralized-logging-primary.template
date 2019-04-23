@@ -17,7 +17,6 @@ Parameters:
 
   # Email address for the Elasticsearch domain admin
   DomainAdminEmail:
-    Description: The email address of the Elasticsearch domain admin who will receive CloudWatch alarm notifications.
     Type: String
     Default: esdomainadmin@example.com
     AllowedPattern: '^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
@@ -32,7 +31,7 @@ Parameters:
 
   # ES cluster size
   ClusterSize:
-    Description: Amazon ES cluster size; small (2 data nodes), medium (4 data nodes), large (10 data nodes)
+    Description: Amazon ES cluster size; small (4 data nodes), medium (6 data nodes), large (6 data nodes)
     Type: String
     Default: Small
     AllowedValues:
@@ -114,22 +113,6 @@ Metadata:
 
 Mappings:
   InstanceMap:
-    t2.micro: {"Arch":"HVM64"}
-    us-east-1: {"instancetype":"t2.micro"}
-    us-east-2: {"instancetype":"t2.micro"}
-    us-west-1: {"instancetype":"t2.micro"}
-    us-west-2: {"instancetype":"t2.micro"}
-    ca-central-1: {"instancetype":"t2.micro"}
-    eu-west-1: {"instancetype":"t2.micro"}
-    eu-central-1: {"instancetype":"t2.micro"}
-    eu-west-2: {"instancetype":"t2.micro"}
-    eu-west-3: {"instancetype":"t2.micro"}
-    ap-southeast-1: {"instancetype":"t2.micro"}
-    ap-southeast-2: {"instancetype":"t2.micro"}
-    ap-northeast-1: {"instancetype":"t2.micro"}
-    ap-northeast-2: {"instancetype":"t2.micro"}
-    ap-south-1: {"instancetype":"t2.micro"}
-    sa-east-1: {"instancetype":"t2.micro"}
     send-data: {"SendAnonymousData": "Yes"}
 
   # V57271571 - 10/09/2018 - update tshirt size
@@ -167,6 +150,7 @@ Resources:
   #
   # Creates a user pool in cognito to auth against
   UserPool:
+    DeletionPolicy: Retain
     Type: 'AWS::Cognito::UserPool'
     Properties:
       UserPoolName: !Sub ${DOMAINNAME}_kibana_access
@@ -186,6 +170,7 @@ Resources:
 
   # Creates a needed group in Cognito for Kibana access
   UserPoolGroup:
+    DeletionPolicy: Retain
     Type: "AWS::Cognito::UserPoolGroup"
     Properties:
       Description: 'User pool group for Kibana access'
@@ -195,6 +180,7 @@ Resources:
 
   # Creates a User Pool Client to be used by the identity pool
   UserPoolClient:
+    DeletionPolicy: Retain
     Type: 'AWS::Cognito::UserPoolClient'
     Properties:
       ClientName: !Sub ${DOMAINNAME}-client
@@ -203,6 +189,7 @@ Resources:
 
   # Creates a federated Identity pool
   IdentityPool:
+    DeletionPolicy: Retain
     Type: 'AWS::Cognito::IdentityPool'
     Properties:
       IdentityPoolName: !Sub ${DOMAINNAME}Identity
@@ -214,6 +201,7 @@ Resources:
   # Create a role for unauthorized access to AWS resources. Very limited access.
   # Only allows users in the previously created Identity Pool
   CognitoUnAuthorizedRole:
+    DeletionPolicy: Retain
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -250,6 +238,7 @@ Resources:
   # Create a role for authorized access to AWS resources.
   # Only allows users in the previously created Identity Pool
   CognitoAuthorizedRole:
+    DeletionPolicy: Retain
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -294,6 +283,7 @@ Resources:
 
   CognitoESAccessRole:
     Type: 'AWS::IAM::Role'
+    DeletionPolicy: Retain
     Properties:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonESCognitoAccess
@@ -308,6 +298,7 @@ Resources:
 
   # Assigns the roles to the Identity Pool
   IdentityPoolRoleMapping:
+    DeletionPolicy: Retain
     Type: 'AWS::Cognito::IdentityPoolRoleAttachment'
     Properties:
       IdentityPoolId: !Ref IdentityPool
@@ -317,6 +308,7 @@ Resources:
 
   AdminUser:
     Type: 'AWS::Cognito::UserPoolUser'
+    DeletionPolicy: Retain
     Properties:
       DesiredDeliveryMediums:
         - 'EMAIL'
@@ -767,14 +759,14 @@ Resources:
         Variables:
           # V56536055 - 10/08/2018 - better logging capabilities
           LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
-          DomainEndpoint: !Sub ${ElasticsearchAWSLogs.DomainEndpoint}
-          MasterRole: !Sub ${LoggingMasterRole}
-          SessionId: !Sub ${AWS::AccountId}-${AWS::Region}
-          Owner: Hub
-          Solution: SO0009
-          ClusterSize: !Ref ClusterSize
+          DOMAIN_ENDPOINT: !Sub ${ElasticsearchAWSLogs.DomainEndpoint}
+          MASTER_ROLE: !Sub ${LoggingMasterRole}
+          SESSION_ID: !Sub ${AWS::AccountId}-${AWS::Region}
+          OWNER: Hub
+          SOLUTION: SO0009
+          CLUSTER_SIZE: !Ref ClusterSize
           UUID: !Sub ${CreateUniqueID.UUID}
-          AnonymousData: !FindInMap [InstanceMap, send-data, SendAnonymousData]
+          ANONYMOUS_DATA: !FindInMap [InstanceMap, send-data, SendAnonymousData]
       Handler: index.handler
       Role: !Sub ${LogStreamerRole.Arn}
       Code:
@@ -801,56 +793,11 @@ Resources:
         DemoSubnet: !Sub ${DemoSubnet}
       TemplateURL: !Join ["/", ["https://s3.amazonaws.com/%%TEMPLATE_BUCKET%%", !FindInMap ["SourceCode", "General", "KeyPrefix"], "centralized-logging-demo.template"]]
 
-
-  #
-  # Solution Helper resources
-  # [SolutionHelperRole, SolutionHelper, SendingAnonymousData, CreateUniqueID]
-  #
-  SolutionHelperRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service: lambda.amazonaws.com
-          Action: sts:AssumeRole
-      Path: /
-      Policies:
-      - PolicyName: Custom_Lambda_Loader_Permissions
-        PolicyDocument:
-          Version: 2012-10-17
-          Statement:
-          - Effect: Allow
-            Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-          - Effect: Allow
-            Action:
-            - ec2:DescribeImages
-            Resource: "*"
-
-  SolutionHelper:
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: solution-helper.lambda_handler
-      Role: !Sub ${SolutionHelperRole.Arn}
-      Description: EFS Backup - This function is a CloudFormation custom lambda resource that generates UUID for each deployment.
-      Code:
-       S3Bucket: !Sub solutions-${AWS::Region}
-       S3Key: library/solution-helper/v3/solution-helper.zip
-      Runtime: python2.7
-      Timeout: 300
-
   CreateUniqueID:
     Type: Custom::LoadLambda
     Properties:
-      ServiceToken: !Sub ${SolutionHelper.Arn}
-      Region: !Sub ${AWS::Region}
-      CreateUniqueID: true
+      ServiceToken: !GetAtt LambdaESCognito.Arn
+      Resource: UUID
 
 Outputs:
   DomainEndpoint:

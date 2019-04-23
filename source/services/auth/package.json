@@ -8,10 +8,11 @@
   "version": "0.0.1",
   "private": "true",
   "dependencies": {
-    "aws-sdk": "*"
+    "uuid": "*"
   },
   "devDependencies": {
-    "npm-run-all": "*"
+    "npm-run-all": "*",
+    "aws-sdk": "*"
   },
   "scripts": {
     "pretest": "npm install",
