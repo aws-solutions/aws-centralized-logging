@@ -6,7 +6,7 @@
 # author: aws-solutions-builder@
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: (SO0009d) - AWS Centralized Logging Solution, sample sources template
+Description: (SO0009d) - AWS Centralized Logging Solution, sample sources template (Version %%VERSION%%)
 
 Parameters:
   # Log Streamer Function Arn
@@ -34,6 +34,13 @@ Parameters:
     Default: 10.250.250.0/24
     ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x
 
+  LatestAMIId:
+    Description: >-
+      Automatically selects the latest Amazon Linux AMI. Do not change this
+      value
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: /aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2
+
 Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
@@ -51,24 +58,11 @@ Metadata:
         default: Lambda Arn for Log Streaming
 
 Mappings:
-  # Instance mapping for different regions
-  InstanceMap:
-    t2.micro: {"Arch":"HVM64"}
-    us-east-1: {"instancetype":"t2.micro"}
-    us-east-2: {"instancetype":"t2.micro"}
-    us-west-1: {"instancetype":"t2.micro"}
-    us-west-2: {"instancetype":"t2.micro"}
-    ca-central-1: {"instancetype":"t2.micro"}
-    eu-west-1: {"instancetype":"t2.micro"}
-    eu-central-1: {"instancetype":"t2.micro"}
-    eu-west-2: {"instancetype":"t2.micro"}
-    eu-west-3: {"instancetype":"t2.micro"}
-    ap-southeast-1: {"instancetype":"t2.micro"}
-    ap-southeast-2: {"instancetype":"t2.micro"}
-    ap-northeast-1: {"instancetype":"t2.micro"}
-    ap-northeast-2: {"instancetype":"t2.micro"}
-    ap-south-1: {"instancetype":"t2.micro"}
-    sa-east-1: {"instancetype":"t2.micro"}
+
+  # Instance type for demo box
+  EC2: 
+    Instance: 
+      Type: 't3.micro' 
 
   # CloudWatch logs pattern mapping
   FilterPatternLookup:
@@ -84,12 +78,6 @@ Mappings:
       Pattern: '[]'
     Other:
       Pattern: ''
-
-  # Lambda source code mapping
-  SourceCode:
-    General:
-      S3Bucket: "%%BUCKET_NAME%%"
-      KeyPrefix: "centralized-logging/%%VERSION%%"
 
 Resources:
   #
@@ -114,6 +102,11 @@ Resources:
       Tags:
       - Key: Name
         Value: centralized-logging-demo subnet
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W33
+            reason: "This is where the test webserver is deployed for for a static page to demo the functionality of the solution by generating log for demo purposes. Hence requires a public IP"
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -155,7 +148,7 @@ Resources:
       RetentionInDays: 1
 
   FlowlogsRole:
-    Type: AWS::IAM::Role
+    Type: AWS::IAM::Role 
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -180,6 +173,11 @@ Resources:
             - logs:DescribeLogStreams
             - logs:PutLogEvents
             Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "Push logs from various resources to cloudwatch logs. Hence open"
 
   VPCFlowLog:
     Type: AWS::EC2::FlowLog
@@ -197,6 +195,33 @@ Resources:
       FilterPattern: !FindInMap [FilterPatternLookup, FlowLogs, Pattern]
       LogGroupName: !Sub ${VPCFlowLogGroup}
 
+  S3LoggingBucket:
+    DeletionPolicy: Retain
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub aws-trailbucket-s3-access-logs-${AWS::AccountId}-${AWS::Region}
+      AccessControl: LogDeliveryWrite
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: 'AWS Centralized Logging Demo'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W35
+            reason: "This S3 bucket is used as the destination for storing access logs"
+          - id: W51
+            reason: "Log delivery controlled by ACL, not bucket policy"
 
   #
   # CloudTrail resources
@@ -205,11 +230,27 @@ Resources:
   TrailBucket:
     DeletionPolicy: Retain
     Type: AWS::S3::Bucket
+    Properties:
+      LoggingConfiguration:
+        DestinationBucketName: !Ref S3LoggingBucket
+        LogFilePrefix: access-logs
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: 'AWS Centralized Logging Demo'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
 
   TrailBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Sub ${TrailBucket}
+      Bucket: !Ref TrailBucket
       PolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -279,14 +320,7 @@ Resources:
   # [EC2LogRole, InstanceProfile, WebServerSecurityGroup, WebServerSecurityGroupIngress, WebServerLogtoLambda]
   #
   EC2LogRole:
-    Type: AWS::IAM::Role
-    ##
-    # V56617021 - 10/08/2018 - Suppress cfn_nag
-    Metadata:
-      cfn_nag:
-        rules_to_suppress:
-        - id: F3
-          reason: Override the IAM role to allow logs:Create* action on its permissions policy
+    Type: AWS::IAM::Role  
     Properties:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
@@ -310,7 +344,7 @@ Resources:
               - s3:GetObject
               Resource:
               - !Sub ${WebServerLogGroup.Arn}
-              - arn:aws:s3:::*
+              - !GetAtt TrailBucket.Arn
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -409,7 +443,7 @@ Resources:
       ResourceSignal:
         Timeout: PT15M
     Properties:
-      ImageId: !Sub ${AMIInfo.Id}
+      ImageId: !Ref LatestAMIId
       Tags:
       - Key: Name
         Value: Web Server centralized-logging-demo
@@ -420,7 +454,7 @@ Resources:
         DeviceIndex: 0
         DeleteOnTermination: true
         SubnetId: !Sub ${PublicSubnet}
-      InstanceType: !FindInMap [InstanceMap, !Ref "AWS::Region", "instancetype"]
+      InstanceType: !FindInMap [EC2, Instance, Type]
       IamInstanceProfile: !Sub ${InstanceProfile}
       UserData: !Base64
         'Fn::Join':
@@ -484,8 +518,8 @@ Resources:
     Metadata:
       cfn_nag:
         rules_to_suppress:
-        - id: F1000
-          reason: Override the SecurityGroup, egress rule defined as well
+          - id: F1000
+            reason: Override the SecurityGroup, egress rule defined as well
     Properties:
       GroupDescription: Enable HTTP access via port 80
       VpcId: !Sub ${DemoVPC}
@@ -493,20 +527,36 @@ Resources:
   WebServerSecurityGroupIngress:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
+      Description: Allow inbound access to the webserver from the internet
       GroupId: !Sub ${WebServerSecurityGroup}
       IpProtocol: tcp
       FromPort: 80
       ToPort: 80
       CidrIp: 0.0.0.0/0
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W9
+            reason: "The server is a public webserver and hence CIDR mask is open"
+          - id: W2
+            reason: "To demo the functionality of this solution, there is public facing webserver with which the SecurityGroup will be associated. This webserver instance will be used only as a mechanism to generate logs. Hence no ELB has been added to the infrastructure"
 
   WebServerSecurityGroupEgress:
     Type: AWS::EC2::SecurityGroupEgress
     Properties:
+      Description: Allow outbound access to the internet for all requests coming in
       CidrIp: 0.0.0.0/0
       FromPort: 0
       GroupId: !Sub ${WebServerSecurityGroup}
       IpProtocol: tcp
       ToPort: 65535
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W5
+            reason: "The webserver is a public access server and hence CIDR range is open"
+          - id: W29
+            reason: "The TCP/IP protocol requires the ephemeral port range for communication over the internet for a public server"
 
   WebServerLogtoLambda:
     Type: AWS::Logs::SubscriptionFilter
@@ -514,57 +564,6 @@ Resources:
       DestinationArn: !Sub ${LogStreamerArn}
       FilterPattern: !FindInMap [FilterPatternLookup, Common, Pattern]
       LogGroupName: !Sub ${WebServerLogGroup}
-
-
-  #
-  # Solution Helper resources
-  # [AMIInfoFunction, AMIInfo, SolutionHelperRole]
-  #
-  AMIInfoFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      Code:
-        S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
-        S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-ami-lookup.zip"]]
-      Handler: amilookup.handler
-      Runtime: nodejs8.10
-      Timeout: 300
-      Description: This function is CloudFormation custom lambda resource that looks up the latest AMI ID.
-      Role: !Sub ${SolutionHelperRole.Arn}
-
-  AMIInfo:
-    Type: Custom::AMIInfo
-    Properties:
-      ServiceToken: !GetAtt AMIInfoFunction.Arn
-      Region: !Ref "AWS::Region"
-      Architecture: !FindInMap [InstanceMap, !FindInMap [InstanceMap, !Ref "AWS::Region", "instancetype"], "Arch"]
-
-  SolutionHelperRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-        - Effect: Allow
-          Principal:
-            Service: lambda.amazonaws.com
-          Action: sts:AssumeRole
-      Path: /
-      Policies:
-      - PolicyName: Custom_Lambda_Loader_Permissions
-        PolicyDocument:
-          Version: 2012-10-17
-          Statement:
-          - Effect: Allow
-            Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-          - Effect: Allow
-            Action:
-            - ec2:DescribeImages
-            Resource: "*"
 
 Outputs:
   PublicIP:

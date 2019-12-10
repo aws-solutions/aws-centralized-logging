@@ -1,17 +1,16 @@
 /*******************************************************************************
-* Copyright 2019 Amazon.com, Inc. and its affiliates. All Rights Reserved.
+*  Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved. 
 *
-* Licensed under the Amazon Software License (the "License").
-* You may not use this file except in compliance with the License.
-* A copy of the License is located at
+*  Licensed under the Apache License Version 2.0 (the "License"). You may not 
+*  use this file except in compliance with the License. A copy of the License is 
+*  located at                                                           
 *
-*   http://aws.amazon.com/asl/
+*      http://www.apache.org/licenses/
 *
-* or in the "license" file accompanying this file. This file is distributed
-* on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-* express or implied. See the License for the specific language governing
-* permissions and limitations under the License.
-*
+*  or in the "license" file accompanying this file. This file is distributed on  
+*  an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or 
+*  implied. See the License for the specific language governing permissions and  
+*  limitations under the License.      
 ********************************************************************************/
 'use strict';
 /**
@@ -40,38 +39,24 @@ exports.handler = function(event, context) {
           sendResponse(event, context, "SUCCESS", responseData);
         }
         else {
-          //create a domain for a provided Cognito User Pool
+
           let params = {
-              Domain: event.ResourceProperties.CognitoDomain,
-              UserPoolId: event.ResourceProperties.UserPoolId
+              DomainName: event.ResourceProperties.Domain,
+              CognitoOptions: {
+                  Enabled: true,
+                  IdentityPoolId: event.ResourceProperties.IdentityPoolId,
+                  RoleArn: event.ResourceProperties.RoleArn,
+                  UserPoolId: event.ResourceProperties.UserPoolId
+              }
           };
-          cognitoidentityserviceprovider.createUserPoolDomain(params, function(err, data) {
+          es.updateElasticsearchDomainConfig(params, function(err, data) {
               if (err) {
-                  LOGGER.log('ERROR',`error creating domain on Cognito User Pool: ${err.stack}`);
+                  LOGGER.log('ERROR',`error updating the Elasticsearch domain config: ${err.stack}`);
                   sendResponse(event, context, "FAILED", responseData);
               }
               else {
-                  //update the ES domain config for Cognito Auth
-                  LOGGER.log('INFO',"Cognito User Pool Domain Create SUCCEEDED");
-                  let params = {
-                      DomainName: event.ResourceProperties.Domain,
-                      CognitoOptions: {
-                          Enabled: true,
-                          IdentityPoolId: event.ResourceProperties.IdentityPoolId,
-                          RoleArn: event.ResourceProperties.RoleArn,
-                          UserPoolId: event.ResourceProperties.UserPoolId
-                      }
-                  };
-                  es.updateElasticsearchDomainConfig(params, function(err, data) {
-                      if (err) {
-                          LOGGER.log('ERROR',`error updating the Elasticsearch domain config: ${err.stack}`);
-                          sendResponse(event, context, "FAILED", responseData);
-                      }
-                      else {
-                          LOGGER.log('INFO',"Elasticsearch domain config update SUCCEEDED");
-                          sendResponse(event, context, "SUCCESS", responseData);
-                      }
-                  });
+                  LOGGER.log('INFO',"Elasticsearch domain config update SUCCEEDED");
+                  sendResponse(event, context, "SUCCESS", responseData);
               }
           });
 

@@ -58,7 +58,7 @@ The AWS Centralized Logging Solution project consists of indexing microservices 
 ```
 ***
 
-## v3.0.0 changes
+## v3.0.1 changes
 ```
 * Amazon Cognito integration for user login
 * Elasticsearch version update to 6.3
@@ -68,10 +68,11 @@ The AWS Centralized Logging Solution project consists of indexing microservices 
 
 ***
 
-Copyright 2017 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
-Licensed under the Amazon Software License (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
+Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
 
-    http://aws.amazon.com/asl/
+    http://www.apache.org/licenses/
 
 or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions and limitations under the License.
+

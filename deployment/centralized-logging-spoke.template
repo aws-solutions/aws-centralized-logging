@@ -6,7 +6,7 @@
 # author: aws-solutions-builder@
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: (SO0009s) - AWS Centralized Logging Solution, spoke accounts template
+Description: (SO0009s) - AWS Centralized Logging Solution, spoke accounts template (Version %%VERSION%%)
 
 Parameters:
   # Name for ES Domain
@@ -95,7 +95,7 @@ Mappings:
   SourceCode:
     General:
       S3Bucket: "%%BUCKET_NAME%%"
-      KeyPrefix: "centralized-logging/%%VERSION%%"
+      KeyPrefix: "%%SOLUTION_NAME%%/%%VERSION%%"
 
 Conditions:
   DemoData: !Equals [!Ref DemoTemplate, 'Yes']
@@ -106,6 +106,7 @@ Resources:
   # [LogStreamerRole, LogStreamer, LogStreamerInvokePermission, DemoStack]
   #
   LogStreamerRole:
+    DeletionPolicy: 'Retain'
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -131,6 +132,11 @@ Resources:
               Action:
               - sts:AssumeRole
               Resource: !Sub ${MasterRole}
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "The resource access is restricted to lambda functions. The lambda function is generated dynamically during CF execution to provide update flexibility without replacement. Adding the function name dynamically would add cyclic dependency"
 
   LogStreamer:
     Type: AWS::Lambda::Function
@@ -140,20 +146,20 @@ Resources:
         Variables:
           # V56536055 - 10/08/2018 - better logging capabilities
           LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
-          DomainEndpoint: !Sub ${ESDomain}
-          MasterRole: !Sub ${MasterRole}
-          SessionId: !Sub ${AWS::AccountId}-${AWS::Region}
-          Owner: Spoke
-          Solution: SO0009s
-          ClusterSize: !Ref ClusterSize
+          DOMAIN_ENDPOINT: !Sub ${ESDomain}
+          MASTER_ROLE: !Sub ${MasterRole}
+          SESSION_ID: !Sub ${AWS::AccountId}-${AWS::Region}
+          OWNER: Spoke
+          SOLUTION: SO0009s
+          CLUSTER_SIZE: !Ref ClusterSize
           UUID: !Sub ${CreateUniqueID.UUID}
-          AnonymousData: !FindInMap [InstanceMap, send-data, SendAnonymousData]
+          ANONYMOUS_DATA: !FindInMap [InstanceMap, send-data, SendAnonymousData]
       Handler: index.handler
       Role: !Sub ${LogStreamerRole.Arn}
       Code:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-indexing-service.zip"]]
-      Runtime: nodejs8.10
+      Runtime: nodejs12.x
       Timeout: 300
 
   LogStreamerInvokePermission:
@@ -172,53 +178,63 @@ Resources:
         LogStreamerArn: !Sub ${LogStreamer.Arn}
         DemoVPCCidr: !Sub ${DemoVPC}
         DemoSubnet: !Sub ${DemoSubnet}
-      TemplateURL: !Join ["/", ["https://s3.amazonaws.com/%%TEMPLATE_BUCKET%%", !FindInMap ["SourceCode", "General", "KeyPrefix"], "centralized-logging-demo.template"]]
+      TemplateURL: !Join 
+        - ''
+        - - 'https://'
+          - !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], "reference"]]
+          - '.s3.amazonaws.com/'
+          - !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "centralized-logging-demo.template"]]
 
   #
   # Solution Helper resources
-  # [SolutionHelperRole, SolutionHelper, SendingAnonymousData, CreateUniqueID]
+  # [CLSolutionHelperRole, CLSolutionHelper, CreateUniqueID]
   #
-  SolutionHelperRole:
+  CLSolutionHelper:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Description: Centralized Logging - Lambda function to generate a unique ID
+      Environment:
+        Variables:
+          # V56536055 - 10/08/2018 - better logging capabilities
+          LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
+      Handler: index.handler
+      Runtime: nodejs12.x
+      Timeout: 300
+      Role: !GetAtt CLSolutionHelperRole.Arn
+      Code:
+        S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
+        S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-auth.zip"]]
+
+  CLSolutionHelperRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: '2012-10-17'
         Statement:
         - Effect: Allow
           Principal:
-            Service: lambda.amazonaws.com
-          Action: sts:AssumeRole
-      Path: /
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
       Policies:
-      - PolicyName: Custom_Lambda_Loader_Permissions
+      - PolicyName: root
         PolicyDocument:
-          Version: 2012-10-17
+          Version: '2012-10-17'
           Statement:
           - Effect: Allow
             Action:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
-            Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*
-
-  SolutionHelper:
-    Type: AWS::Lambda::Function
-    Properties:
-      Handler: solution-helper.lambda_handler
-      Role: !Sub ${SolutionHelperRole.Arn}
-      Description: EFS Backup - This function is a CloudFormation custom lambda resource that generates UUID for each deployment.
-      Code:
-       S3Bucket: !Sub solutions-${AWS::Region}
-       S3Key: library/solution-helper/v3/solution-helper.zip
-      Runtime: python2.7
-      Timeout: 300
+            Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*'
 
   CreateUniqueID:
     Type: Custom::LoadLambda
     Properties:
-      ServiceToken: !Sub ${SolutionHelper.Arn}
-      Region: !Sub ${AWS::Region}
-      CreateUniqueID: true
+      ServiceToken: !GetAtt CLSolutionHelper.Arn
+      Resource: UUID
 
 Outputs:
   LambdaArn:

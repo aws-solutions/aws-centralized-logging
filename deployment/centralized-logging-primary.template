@@ -6,7 +6,7 @@
 # author: aws-solutions-builder@
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: (SO0009) - AWS Centralized Logging Solution, primary template
+Description: (SO0009) - AWS Centralized Logging Solution, primary template (Version %%VERSION%%)
 
 Parameters:
   # Name for ES Domain
@@ -19,14 +19,14 @@ Parameters:
   DomainAdminEmail:
     Type: String
     Default: esdomainadmin@example.com
-    AllowedPattern: '^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
+    AllowedPattern: '^\w+([\.-\\+]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
     Description: E-mail address of the Elasticsearch admin
 
   # Email address for Cognito Admin user
   CognitoAdminEmail:
     Type: String
     Default: cognitoadmin@example.com
-    AllowedPattern: '^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
+    AllowedPattern: '^\w+([\.-\\+]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
     Description: E-mail address of the Cognito admin
 
   # ES cluster size
@@ -115,30 +115,27 @@ Mappings:
   InstanceMap:
     send-data: {"SendAnonymousData": "Yes"}
 
-  # V57271571 - 10/09/2018 - update tshirt size
-  InstanceSizing:
-    elasticsearch:
-      Small: i3.large.elasticsearch
-      Medium: i3.2xlarge.elasticsearch
-      Large: i3.4xlarge.elasticsearch
-
-  MasterSizing:
-    elasticsearch:
-      Small: c4.large.elasticsearch
-      Medium: c4.large.elasticsearch
-      Large: c4.large.elasticsearch
-
-  NodeCount:
-    elasticsearch:
+  ElasticSearch:
+    Parameters:
+      Version: '7.1'
+    NodeCount:
       Small: '4'
       Medium: '6'
       Large: '6'
+    MasterSize:
+      Small: c5.large.elasticsearch
+      Medium: c5.large.elasticsearch
+      Large: c5.large.elasticsearch
+    InstanceSize:
+      Small: i3.large.elasticsearch
+      Medium: i3.2xlarge.elasticsearch
+      Large: i3.4xlarge.elasticsearch
 
   # Lambda source code mapping
   SourceCode:
     General:
       S3Bucket: "%%BUCKET_NAME%%"
-      KeyPrefix: "centralized-logging/%%VERSION%%"
+      KeyPrefix: "%%SOLUTION_NAME%%/%%VERSION%%"
 
 Conditions:
   DemoData: !Equals [!Ref DemoTemplate, 'Yes']
@@ -150,7 +147,7 @@ Resources:
   #
   # Creates a user pool in cognito to auth against
   UserPool:
-    DeletionPolicy: Retain
+    DeletionPolicy: 'Retain'
     Type: 'AWS::Cognito::UserPool'
     Properties:
       UserPoolName: !Sub ${DOMAINNAME}_kibana_access
@@ -168,19 +165,42 @@ Resources:
           Mutable: false
           Required: true
 
-  # Creates a needed group in Cognito for Kibana access
-  UserPoolGroup:
-    DeletionPolicy: Retain
+  # Custom resource to configure Cognito and ES
+  SetupESCognito:
+    DependsOn: 
+      - 'ElasticsearchAWSLogs'
+      - 'UserPoolDomain'
+    Type: 'Custom::SetupESCognito'
+    Version: 1.0
+    Properties:
+      ServiceToken: !GetAtt CLSolutionHelper.Arn
+      Domain: !Ref DOMAINNAME
+      CognitoDomain: !Sub ${DOMAINNAME}-${AWS::AccountId}
+      UserPoolId: !Ref UserPool
+      IdentityPoolId: !Ref IdentityPool
+      RoleArn: !GetAtt CognitoESAccessRole.Arn
+
+  UserPoolDomain:
+    DeletionPolicy: 'Retain'
+    Type: 'AWS::Cognito::UserPoolDomain'
+    Properties:
+      Domain: !Sub ${DOMAINNAME}-${AWS::AccountId}
+      UserPoolId: !Ref UserPool
+
+  # Creates a group in Cognito for Kibana ADMIN access
+  UserPoolGroupAccess:
+    DeletionPolicy: 'Retain'
     Type: "AWS::Cognito::UserPoolGroup"
     Properties:
-      Description: 'User pool group for Kibana access'
-      GroupName: !Sub ${DOMAINNAME}_kibana_access_group
+      Description: 'User pool group for Kibana full access'
+      GroupName: !Sub ${DOMAINNAME}_kibana_admin
       Precedence: 0
       UserPoolId: !Ref UserPool
+      RoleArn: !GetAtt CLAccessUserRole.Arn
 
   # Creates a User Pool Client to be used by the identity pool
   UserPoolClient:
-    DeletionPolicy: Retain
+    DeletionPolicy: 'Retain'
     Type: 'AWS::Cognito::UserPoolClient'
     Properties:
       ClientName: !Sub ${DOMAINNAME}-client
@@ -189,56 +209,27 @@ Resources:
 
   # Creates a federated Identity pool
   IdentityPool:
-    DeletionPolicy: Retain
+    DeletionPolicy: 'Retain'
     Type: 'AWS::Cognito::IdentityPool'
     Properties:
       IdentityPoolName: !Sub ${DOMAINNAME}Identity
-      AllowUnauthenticatedIdentities: true
+      AllowUnauthenticatedIdentities: false # Prevent anonymous access
       CognitoIdentityProviders:
         - ClientId: !Ref UserPoolClient
           ProviderName: !GetAtt UserPool.ProviderName
+          ServerSideTokenCheck: true
 
-  # Create a role for unauthorized access to AWS resources. Very limited access.
-  # Only allows users in the previously created Identity Pool
-  CognitoUnAuthorizedRole:
-    DeletionPolicy: Retain
-    Type: 'AWS::IAM::Role'
+  # Assigns the roles to the Identity Pool
+  IdentityPoolRoleMapping:
+    DeletionPolicy: 'Retain'
+    Type: 'AWS::Cognito::IdentityPoolRoleAttachment'
     Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: 'Allow'
-            Principal:
-              Federated: 'cognito-identity.amazonaws.com'
-            Action:
-              - 'sts:AssumeRoleWithWebIdentity'
-            Condition:
-              StringEquals:
-                'cognito-identity.amazonaws.com:aud': !Ref IdentityPool
-              'ForAnyValue:StringLike':
-                'cognito-identity.amazonaws.com:amr': unauthenticated
-      Policies:
-        - PolicyName: 'CognitoUnauthorizedPolicy'
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: 'Allow'
-                Action:
-                  - 'mobileanalytics:PutEvents'
-                  - 'cognito-sync:BulkPublish'
-                  - 'cognito-sync:DescribeIdentityPoolUsage'
-                  - 'cognito-sync:GetBulkPublishDetails'
-                  - 'cognito-sync:GetCognitoEvents'
-                  - 'cognito-sync:GetIdentityPoolConfiguration'
-                  - 'cognito-sync:ListIdentityPoolUsage'
-                  - 'cognito-sync:SetCognitoEvents'
-                  - 'congito-sync:SetIdentityPoolConfiguration'
-                Resource: !Sub 'arn:aws:cognito-identity:${AWS::Region}:${AWS::AccountId}:identitypool/${IdentityPool}'
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt CLAccessUserRole.Arn
 
-  # Create a role for authorized access to AWS resources.
-  # Only allows users in the previously created Identity Pool
-  CognitoAuthorizedRole:
-    DeletionPolicy: Retain
+  CLAccessUserRole:
+    DeletionPolicy: 'Retain'
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -255,38 +246,58 @@ Resources:
               'ForAnyValue:StringLike':
                 'cognito-identity.amazonaws.com:amr': authenticated
       Policies:
-        - PolicyName: 'CognitoAuthorizedPolicy'
+        - PolicyName: 'CognitoAccessPolicy'
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: 'Allow'
-                Action:
-                  - 'mobileanalytics:PutEvents'
-                  - 'cognito-sync:BulkPublish'
-                  - 'cognito-sync:DescribeIdentityPoolUsage'
-                  - 'cognito-sync:GetBulkPublishDetails'
-                  - 'cognito-sync:GetCognitoEvents'
-                  - 'cognito-sync:GetIdentityPoolConfiguration'
-                  - 'cognito-sync:ListIdentityPoolUsage'
-                  - 'cognito-sync:SetCognitoEvents'
-                  - 'congito-sync:SetIdentityPoolConfiguration'
-                  - 'cognito-identity:DeleteIdentityPool'
-                  - 'cognito-identity:DescribeIdentityPool'
-                  - 'cognito-identity:GetIdentityPoolRoles'
-                  - 'cognito-identity:GetOpenIdTokenForDeveloperIdentity'
-                  - 'cognito-identity:ListIdentities'
-                  - 'cognito-identity:LookupDeveloperIdentity'
-                  - 'cognito-identity:MergeDeveloperIdentities'
-                  - 'cognito-identity:UnlikeDeveloperIdentity'
-                  - 'cognito-identity:UpdateIdentityPool'
-                Resource: !Sub 'arn:aws:cognito-identity:${AWS::Region}:${AWS::AccountId}:identitypool/${IdentityPool}'
+                Action: 
+                  - 'es:ESHttp*'
+                Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DOMAINNAME}/*'
 
+  # Policy passed to the ES API to execute updateElasticsearchDomainConfig
+  CognitoESAccessPolicy:
+    Type: 'AWS::IAM::Policy'
+    DeletionPolicy: 'Retain'
+    Properties:
+      PolicyName: 'CentralizedLoggingESCognitoAccess'
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ESCognitoPerms
+            Effect: Allow
+            Action:
+              - 'cognito-idp:DescribeUserPool'
+              - 'cognito-idp:CreateUserPoolClient'
+              - 'cognito-idp:DeleteUserPoolClient'
+              - 'cognito-idp:DescribeUserPoolClient'
+              - 'cognito-idp:AdminInitiateAuth'
+              - 'cognito-idp:AdminUserGlobalSignOut'
+              - 'cognito-idp:ListUserPoolClients'
+              - 'cognito-identity:DescribeIdentityPool'
+              - 'cognito-identity:UpdateIdentityPool'
+              - 'cognito-identity:SetIdentityPoolRoles'
+              - 'cognito-identity:GetIdentityPoolRoles'
+              - 'es:UpdateElasticsearchDomainConfig'
+            Resource: 
+              - !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${UserPool}'
+              - !Sub 'arn:aws:cognito-identity:${AWS::Region}:${AWS::AccountId}:identitypool/${IdentityPool}'
+              - !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DOMAINNAME}'
+          - Sid: 'PassRole'
+            Effect: 'Allow'
+            Action: 'iam:PassRole'
+            Condition:
+              StringLike: 
+                'iam:PassedToService': 'cognito-identity.amazonaws.com'
+            Resource: !GetAtt CognitoESAccessRole.Arn
+      Roles: 
+        - !Ref CognitoESAccessRole
+
+  # with CognitoESAcessPolicy above
   CognitoESAccessRole:
     Type: 'AWS::IAM::Role'
-    DeletionPolicy: Retain
+    DeletionPolicy: 'Retain'
     Properties:
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/AmazonESCognitoAccess
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -296,19 +307,10 @@ Resources:
             Action:
               - 'sts:AssumeRole'
 
-  # Assigns the roles to the Identity Pool
-  IdentityPoolRoleMapping:
-    DeletionPolicy: Retain
-    Type: 'AWS::Cognito::IdentityPoolRoleAttachment'
-    Properties:
-      IdentityPoolId: !Ref IdentityPool
-      Roles:
-        authenticated: !GetAtt CognitoAuthorizedRole.Arn
-        unauthenticated: !GetAtt CognitoUnAuthorizedRole.Arn
-
-  AdminUser:
+  # Create initial cognito user
+  CognitoUser:
     Type: 'AWS::Cognito::UserPoolUser'
-    DeletionPolicy: Retain
+    DeletionPolicy: 'Retain'
     Properties:
       DesiredDeliveryMediums:
         - 'EMAIL'
@@ -318,35 +320,31 @@ Resources:
       Username: !Ref CognitoAdminEmail
       UserPoolId: !Ref UserPool
 
-  # Custom resource to configure Cognito and ES
-  SetupESCognito:
-    Type: 'Custom::SetupESCognito'
-    Version: 1.0
+  # Place user in UserPoolGroup
+  CognitoUserGroupAttachment:
+    Type: 'AWS::Cognito::UserPoolUserToGroupAttachment'
     Properties:
-      ServiceToken: !GetAtt LambdaESCognito.Arn
-      Domain: !Ref DOMAINNAME
-      CognitoDomain: !Sub ${DOMAINNAME}-${AWS::AccountId}
+      GroupName: !Ref UserPoolGroupAccess
+      Username: !Ref CognitoAdminEmail
       UserPoolId: !Ref UserPool
-      IdentityPoolId: !Ref IdentityPool
-      RoleArn: !GetAtt CognitoESAccessRole.Arn
 
-  LambdaESCognito:
+  CLSolutionHelper:
     Type: 'AWS::Lambda::Function'
     Properties:
-      Description: Centralized Logging - Lambda function to enable cognito authentication for kibana
+      Description: Centralized Logging - Lambda solution helper functions
       Environment:
         Variables:
           # V56536055 - 10/08/2018 - better logging capabilities
           LOG_LEVEL: 'INFO' #change to WARN, ERROR or DEBUG as needed
       Handler: index.handler
-      Runtime: nodejs8.10
+      Runtime: nodejs12.x
       Timeout: 300
-      Role: !GetAtt LambdaESCognitoRole.Arn
+      Role: !GetAtt CLSolutionHelperRole.Arn
       Code:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-auth.zip"]]
 
-  LambdaESCognitoRole:
+  CLSolutionHelperRole:
     Type: AWS::IAM::Role
     DependsOn: ElasticsearchAWSLogs
     Properties:
@@ -384,12 +382,18 @@ Resources:
             Action:
             - iam:PassRole
             Resource: !GetAtt CognitoESAccessRole.Arn
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "CloudWatch Logs captures logs from various resources and hence it is open"
 
   #
   # Primer Elasticsearch resources
   # [LoggingMasterRole, LoggingMasterPolicies, ElasticsearchAWSLogs]
   #
   LoggingMasterRole:
+    DeletionPolicy: 'Retain'
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -408,6 +412,7 @@ Resources:
       Path: "/"
 
   LoggingMasterPolicies:
+    DeletionPolicy: 'Retain' 
     Type: AWS::IAM::Policy
     Properties:
       PolicyName: !Sub logging-master-${AWS::Region}
@@ -420,38 +425,43 @@ Resources:
           Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/*
       Roles:
       - !Ref LoggingMasterRole
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W12
+            reason: "Allow resources to hit ES domains"
 
   ElasticsearchAWSLogs:
     Type: AWS::Elasticsearch::Domain
-    DeletionPolicy: Retain
+    DeletionPolicy: 'Retain'
     Properties:
       DomainName: !Ref DOMAINNAME
-      ElasticsearchVersion: 6.3
+      ElasticsearchVersion: !FindInMap [ElasticSearch, Parameters, Version]
       # V5804310 - 10/09/2018 - ES Encryption at rest
       EncryptionAtRestOptions:
         Enabled: true
       ElasticsearchClusterConfig:
         DedicatedMasterEnabled: true
-        InstanceCount: !FindInMap [NodeCount, elasticsearch, !Ref ClusterSize]
+        InstanceCount: !FindInMap [ElasticSearch, NodeCount, !Ref ClusterSize]
         ZoneAwarenessEnabled: true
-        InstanceType: !FindInMap [InstanceSizing, elasticsearch, !Ref ClusterSize]
-        DedicatedMasterType: !FindInMap [MasterSizing, elasticsearch, !Ref ClusterSize]
+        InstanceType: !FindInMap [ElasticSearch, InstanceSize, !Ref ClusterSize]
+        DedicatedMasterType: !FindInMap [ElasticSearch, MasterSize, !Ref ClusterSize]
         DedicatedMasterCount: 3
       SnapshotOptions:
         AutomatedSnapshotStartHour: '1'
       AccessPolicies:
         Version: 2012-10-17
         Statement:
-        - Action: 'es:*'
+        - Action: 'es:ESHttp*'
           Principal:
             AWS: !Sub ${LoggingMasterRole.Arn}
           Effect: Allow
-          Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/* #removing domain name due to cyclic dependency
-        - Action: 'es:*'
+          Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DOMAINNAME}/*'
+        - Action: 'es:ESHttp*'
           Principal:
             AWS: !Sub
               - arn:aws:sts::${AWS::AccountId}:assumed-role/${AuthRole}/CognitoIdentityCredentials
-              - { AuthRole: !Ref CognitoAuthorizedRole }
+              - { AuthRole: !Ref CLAccessUserRole }
           Effect: Allow
           Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DOMAINNAME}/*'
       # V57095985 - 10/08/2018 - ES Domain needed configurations
@@ -459,12 +469,22 @@ Resources:
       AdvancedOptions:
         rest.action.multi.allow_explicit_index: 'true'
         indices.fielddata.cache.size: 40
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W28
+            reason: "The ES Domain is passed dynamically as as parameter and explicitly specified to ensure that IAM policies are configured to lockdown access to this specific ES instance only"
 
   #
   # SNS Topic
   #
   Topic:
     Type: 'AWS::SNS::Topic'
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W47
+            reason: "Suppressing latest warning"
     Properties:
       DisplayName: 'Centralized Logging CloudWatch alarms notification topic'
 
@@ -721,6 +741,7 @@ Resources:
   # [LogStreamerRole, LogStreamer, LogStreamerInvokePermission, DemoStack]
   #
   LogStreamerRole:
+    DeletionPolicy: 'Retain'
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -746,10 +767,12 @@ Resources:
               Action:
               - es:ESHttpPost
               Resource: !Sub arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/*
-            # - Effect: Allow
-            #   Action:
-            #   - sts:AssumeRole
-            #   Resource: !Sub ${LoggingMasterRole.Arn}
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W11
+            reason: "The resource for log-group is restricted to lambda functions. The name of the fuction is not specified because if specified any change to lambda function would require replacement"
+
 
   LogStreamer:
     Type: AWS::Lambda::Function
@@ -772,7 +795,7 @@ Resources:
       Code:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-indexing-service.zip"]]
-      Runtime: nodejs8.10
+      Runtime: nodejs12.x
       Timeout: 300
 
   LogStreamerInvokePermission:
@@ -791,18 +814,23 @@ Resources:
         LogStreamerArn: !Sub ${LogStreamer.Arn}
         DemoVPCCidr: !Sub ${DemoVPC}
         DemoSubnet: !Sub ${DemoSubnet}
-      TemplateURL: !Join ["/", ["https://s3.amazonaws.com/%%TEMPLATE_BUCKET%%", !FindInMap ["SourceCode", "General", "KeyPrefix"], "centralized-logging-demo.template"]]
+      TemplateURL: !Join 
+        - ''
+        - - 'https://'
+          - !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], "reference"]]
+          - '.s3.amazonaws.com/'
+          - !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "centralized-logging-demo.template"]]
 
   CreateUniqueID:
     Type: Custom::LoadLambda
     Properties:
-      ServiceToken: !GetAtt LambdaESCognito.Arn
+      ServiceToken: !GetAtt CLSolutionHelper.Arn
       Resource: UUID
 
 Outputs:
   DomainEndpoint:
     Description: ES domain endpoint URL
-    Value: !Sub https://${ElasticsearchAWSLogs.DomainEndpoint}
+    Value: !Sub ${ElasticsearchAWSLogs.DomainEndpoint}
 
   KibanaLoginURL:
     Description: Kibana login URL
