@@ -4,6 +4,9 @@ The AWS Centralized Logging Solution is a reference implementation that provides
 ## Getting Started
 To get started with the AWS Centralized Logging Solution, please review the solution documentation. https://aws.amazon.com/answers/logging/centralized-logging/
 
+## Upgrading to v3.2
+Customers using v3.0.0 can upgrade to v3.2 by loading the new primary template. Spoke templates, however, must be removed and installed from the v3.2 spoke template.
+
 ## Running unit tests for customization
 * Clone the repository, then make the desired code changes
 * Next, run unit tests to make sure added customization passes the tests

@@ -18,15 +18,13 @@ Parameters:
   # Email address for the Elasticsearch domain admin
   DomainAdminEmail:
     Type: String
-    Default: esdomainadmin@example.com
-    AllowedPattern: '^\w+([\.-\\+]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
+    AllowedPattern: '^[_A-Za-z0-9-\+\.]+(\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9]+)*(\.[A-Za-z]{2,})$'
     Description: E-mail address of the Elasticsearch admin
 
   # Email address for Cognito Admin user
   CognitoAdminEmail:
     Type: String
-    Default: cognitoadmin@example.com
-    AllowedPattern: '^\w+([\.-\\+]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$'
+    AllowedPattern: '^[_A-Za-z0-9-\+\.]+(\.[_A-Za-z0-9-]+)*@[A-Za-z0-9-]+(\.[A-Za-z0-9]+)*(\.[A-Za-z]{2,})$'
     Description: E-mail address of the Cognito admin
 
   # ES cluster size
@@ -117,7 +115,7 @@ Mappings:
 
   ElasticSearch:
     Parameters:
-      Version: '7.1'
+      Version: '6.3'
     NodeCount:
       Small: '4'
       Medium: '6'
@@ -173,7 +171,7 @@ Resources:
     Type: 'Custom::SetupESCognito'
     Version: 1.0
     Properties:
-      ServiceToken: !GetAtt CLSolutionHelper.Arn
+      ServiceToken: !GetAtt LambdaESCognito.Arn
       Domain: !Ref DOMAINNAME
       CognitoDomain: !Sub ${DOMAINNAME}-${AWS::AccountId}
       UserPoolId: !Ref UserPool
@@ -188,7 +186,7 @@ Resources:
       UserPoolId: !Ref UserPool
 
   # Creates a group in Cognito for Kibana ADMIN access
-  UserPoolGroupAccess:
+  UserPoolGroup:
     DeletionPolicy: 'Retain'
     Type: "AWS::Cognito::UserPoolGroup"
     Properties:
@@ -196,7 +194,7 @@ Resources:
       GroupName: !Sub ${DOMAINNAME}_kibana_admin
       Precedence: 0
       UserPoolId: !Ref UserPool
-      RoleArn: !GetAtt CLAccessUserRole.Arn
+      RoleArn: !GetAtt CognitoAuthorizedRole.Arn
 
   # Creates a User Pool Client to be used by the identity pool
   UserPoolClient:
@@ -226,9 +224,9 @@ Resources:
     Properties:
       IdentityPoolId: !Ref IdentityPool
       Roles:
-        authenticated: !GetAtt CLAccessUserRole.Arn
+        authenticated: !GetAtt CognitoAuthorizedRole.Arn
 
-  CLAccessUserRole:
+  CognitoAuthorizedRole:
     DeletionPolicy: 'Retain'
     Type: 'AWS::IAM::Role'
     Properties:
@@ -308,7 +306,7 @@ Resources:
               - 'sts:AssumeRole'
 
   # Create initial cognito user
-  CognitoUser:
+  AdminUser:
     Type: 'AWS::Cognito::UserPoolUser'
     DeletionPolicy: 'Retain'
     Properties:
@@ -324,11 +322,11 @@ Resources:
   CognitoUserGroupAttachment:
     Type: 'AWS::Cognito::UserPoolUserToGroupAttachment'
     Properties:
-      GroupName: !Ref UserPoolGroupAccess
+      GroupName: !Ref UserPoolGroup
       Username: !Ref CognitoAdminEmail
       UserPoolId: !Ref UserPool
 
-  CLSolutionHelper:
+  LambdaESCognito:
     Type: 'AWS::Lambda::Function'
     Properties:
       Description: Centralized Logging - Lambda solution helper functions
@@ -339,12 +337,12 @@ Resources:
       Handler: index.handler
       Runtime: nodejs12.x
       Timeout: 300
-      Role: !GetAtt CLSolutionHelperRole.Arn
+      Role: !GetAtt LambdaESCognitoRole.Arn
       Code:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-auth.zip"]]
 
-  CLSolutionHelperRole:
+  LambdaESCognitoRole:
     Type: AWS::IAM::Role
     DependsOn: ElasticsearchAWSLogs
     Properties:
@@ -461,7 +459,7 @@ Resources:
           Principal:
             AWS: !Sub
               - arn:aws:sts::${AWS::AccountId}:assumed-role/${AuthRole}/CognitoIdentityCredentials
-              - { AuthRole: !Ref CLAccessUserRole }
+              - { AuthRole: !Ref CognitoAuthorizedRole }
           Effect: Allow
           Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${DOMAINNAME}/*'
       # V57095985 - 10/08/2018 - ES Domain needed configurations
@@ -824,7 +822,7 @@ Resources:
   CreateUniqueID:
     Type: Custom::LoadLambda
     Properties:
-      ServiceToken: !GetAtt CLSolutionHelper.Arn
+      ServiceToken: !GetAtt LambdaESCognito.Arn
       Resource: UUID
 
 Outputs:

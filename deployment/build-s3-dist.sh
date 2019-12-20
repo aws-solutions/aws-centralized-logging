@@ -58,7 +58,7 @@ for file in $template_dir/*.template
 do
 	do_cmd cp $file $template_dist_dir/ 
 done
-do_cmd cp basic-dashboard-71.json $template_dist_dir/
+do_cmd cp basic-dashboard-63.json $template_dist_dir/
 
 echo "------------------------------------------------------------------------------" 
 echo "[Updating Bucket name]"

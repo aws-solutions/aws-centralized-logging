@@ -187,9 +187,9 @@ Resources:
 
   #
   # Solution Helper resources
-  # [CLSolutionHelperRole, CLSolutionHelper, CreateUniqueID]
+  # [SolutionHelperRole, SolutionHelper, CreateUniqueID]
   #
-  CLSolutionHelper:
+  SolutionHelper:
     Type: 'AWS::Lambda::Function'
     Properties:
       Description: Centralized Logging - Lambda function to generate a unique ID
@@ -200,12 +200,12 @@ Resources:
       Handler: index.handler
       Runtime: nodejs12.x
       Timeout: 300
-      Role: !GetAtt CLSolutionHelperRole.Arn
+      Role: !GetAtt SolutionHelperRole.Arn
       Code:
         S3Bucket: !Join ["-", [!FindInMap ["SourceCode", "General", "S3Bucket"], Ref: "AWS::Region"]]
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-auth.zip"]]
 
-  CLSolutionHelperRole:
+  SolutionHelperRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -233,7 +233,7 @@ Resources:
   CreateUniqueID:
     Type: Custom::LoadLambda
     Properties:
-      ServiceToken: !GetAtt CLSolutionHelper.Arn
+      ServiceToken: !GetAtt SolutionHelper.Arn
       Resource: UUID
 
 Outputs:
