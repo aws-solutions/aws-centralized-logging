@@ -1,8 +1,14 @@
 # AWS Centralized Logging Solution
 The AWS Centralized Logging Solution is a reference implementation that provides a foundation for logging to a centralized account. Customers can leverage the solution to index CloudTrail Logs, CW Logs, VPC Flow Logs on a ElasticSearch domain. The logs can then be searched on different fields.
 
+
+## Implementation Overview
+The diagram below presents the centralized logging architecture you can automatically deploy using the solution's implementation guide and accompanying AWS CloudFormation templates.
+
+![Centralized Logging Architecture](images/centralized-logging-architecture.png)
+
 ## Getting Started
-To get started with the AWS Centralized Logging Solution, please review the solution documentation. https://aws.amazon.com/answers/logging/centralized-logging/
+To get started with the AWS Centralized Logging Solution, please review the solution documentation. https://aws.amazon.com/solutions/implementations/centralized-logging/
 
 ## Upgrading to v3.2
 Customers using v3.0.0 can upgrade to v3.2 by loading the new primary template. Spoke templates, however, must be removed and installed from the v3.2 spoke template.
@@ -77,7 +83,7 @@ The AWS Centralized Logging Solution project consists of indexing microservices 
 
 ***
 
-Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 Licensed under the Apache License Version 2.0 (the "License"). You may not use this file except in compliance with the License. A copy of the License is located at
 
