@@ -5,14 +5,14 @@
   "author": {
     "name": "aws-solutions-builder"
   },
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": "true",
   "engines": {
-    "node": ">=6.10"
+    "node": ">=12.0"
   },
   "dependencies": {
-    "https": "*",
-    "moment": "*"
+    "https": "1.0.0",
+    "moment": "2.25.3"
   },
   "devDependencies": {
     "aws-sdk": "*",

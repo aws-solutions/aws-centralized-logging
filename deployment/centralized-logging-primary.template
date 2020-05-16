@@ -115,7 +115,7 @@ Mappings:
 
   ElasticSearch:
     Parameters:
-      Version: '6.3'
+      Version: '7.4'
     NodeCount:
       Small: '4'
       Medium: '6'

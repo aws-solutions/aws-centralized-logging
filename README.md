@@ -61,6 +61,12 @@ The AWS Centralized Logging Solution project consists of indexing microservices 
 ```
 ***
 
+## v3.2.1 changes
+```
+* Elasticsearch version update to 7.4
+* NodeJS update to 12.x
+```
+
 ## v3.0.1 changes
 ```
 * Amazon Cognito integration for user login
