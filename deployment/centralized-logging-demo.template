@@ -91,6 +91,11 @@ Resources:
       Tags:
       - Key: Name
         Value: centralized-logging-demo VPC
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W60
+            reason: "This is a demo VPC with no ingress other than to the demo web server. VPC flow logs are not necessary."
 
   PublicSubnet:
     Type: AWS::EC2::Subnet

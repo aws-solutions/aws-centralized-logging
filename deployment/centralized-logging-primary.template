@@ -162,6 +162,13 @@ Resources:
           AttributeDataType: String
           Mutable: false
           Required: true
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: True
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: F78
+            reason: "MFAConfiguration can be enabled by the customer upon implementation."
 
   # Custom resource to configure Cognito and ES
   SetupESCognito:
@@ -795,6 +802,11 @@ Resources:
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-indexing-service.zip"]]
       Runtime: nodejs12.x
       Timeout: 300
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: "CloudWatch Logs write permissions granted to lambda-specific loggroup via LogStreamerRole"
 
   LogStreamerInvokePermission:
     Type: AWS::Lambda::Permission

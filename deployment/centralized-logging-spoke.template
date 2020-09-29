@@ -161,6 +161,11 @@ Resources:
         S3Key: !Join ["/", [!FindInMap ["SourceCode", "General", "KeyPrefix"],  "clog-indexing-service.zip"]]
       Runtime: nodejs12.x
       Timeout: 300
+    Metadata:
+      cfn_nag:
+        rules_to_suppress:
+          - id: W58
+            reason: "CloudWatch Logs write permissions granted to lambda-specific loggroup via LogStreamerRole"
 
   LogStreamerInvokePermission:
     Type: AWS::Lambda::Permission

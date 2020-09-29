@@ -17,7 +17,7 @@
   "devDependencies": {
     "aws-sdk": "*",
     "chai": "*",
-    "sinon": "*",
+    "sinon": ">=4.0.0 <5.0.0",
     "sinon-chai": "*",
     "mocha": "*",
     "aws-sdk-mock": "*",
