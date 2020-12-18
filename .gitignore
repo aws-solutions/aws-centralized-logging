@@ -1,0 +1,27 @@
+# Test and Compiler files
+**test.json
+**test.js
+
+# distribution folders
+global-s3-assets
+regional-s3-assets
+open-source
+
+# Generated ouputs
+dist
+coverage
+docs
+npm-debug.log
+*.zip
+.scannerwork
+*.xml
+reports
+
+# Node dependencies
+node_modules
+package-lock.json
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+__snapshots__

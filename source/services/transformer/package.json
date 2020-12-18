@@ -1,0 +1,32 @@
+{
+  "name": "cl-transformer",
+  "version": "4.0.0",
+  "description": "transformer lambda for Centralized Logging solution",
+  "main": "index.js",
+  "scripts": {
+    "pretest": "npm i",
+    "test": "echo \"nothing to do\"",
+    "build:clean": "rm -rf ./node_modules && rm -rf ./dist && rm -f ./package-lock.json",
+    "build:copy": "cp -r ./node_modules ./dist/node_modules",
+    "build:ts": "./node_modules/typescript/bin/tsc --project ./tsconfig.json",
+    "build:install": "npm i",
+    "watch": "tsc -w",
+    "build:zip": "cd ./dist && zip -rq cl-transformer.zip .",
+    "build:all": "npm run build:clean && npm run build:install && npm run build:ts && npm prune --production && npm run build:copy && npm run build:zip"
+  },
+  "author": "aws-solutions",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "got": "^11.5.1",
+    "moment": "^2.27.0",
+    "uuid": "^8.2.0",
+    "winston": "^3.3.3",
+    "aws-sdk": "^2.714.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.0.2",
+    "@types/uuid": "^8.0.0",
+    "@types/node": "^14.0.23",
+    "@types/moment": "^2.13.0"
+  }
+}
