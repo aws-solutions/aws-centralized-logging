@@ -1,0 +1,1178 @@
+{
+  "Description": "(SO0009D) - The AWS CloudFormation template for deployment of the centralized-logging. Version v4.0.0",
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Metadata": {
+    "AWS::CloudFormation::Interface": {
+      "ParameterGroups": [
+        {
+          "Label": {
+            "default": "Destination Configuration"
+          },
+          "Parameters": [
+            "CWDestinationParm"
+          ]
+        }
+      ],
+      "ParameterLabels": {
+        "CWDestinationParm": {
+          "default": "CloudWatch Logs Destination Arn for Log Streaming"
+        }
+      }
+    }
+  },
+  "Parameters": {
+    "CWDestinationParm": {
+      "Type": "String"
+    },
+    "LinuxAMI": {
+      "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>",
+      "Default": "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+    }
+  },
+  "Mappings": {
+    "EC2": {
+      "Instance": {
+        "Type": "t3.micro"
+      }
+    },
+    "FilterPatternLookup": {
+      "Common": {
+        "Pattern": "[host, ident, authuser, date, request, status, bytes, referrer, agent]"
+      },
+      "CloudTrail": {
+        "Pattern": ""
+      },
+      "FlowLogs": {
+        "Pattern": "[version, account_id, interface_id, srcaddr != \"-\", dstaddr != \"-\", srcport != \"-\", dstport != \"-\", protocol, packets, bytes, start, end, action, log_status]"
+      },
+      "Lambda": {
+        "Pattern": "[timestamp=*Z, request_id=\"*-*\", event]"
+      },
+      "SpaceDelimited": {
+        "Pattern": "[]"
+      },
+      "Other": {
+        "Pattern": ""
+      }
+    }
+  },
+  "Resources": {
+    "DemoVPC2409DB3F": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.1.0/26",
+        "EnableDnsHostnames": true,
+        "EnableDnsSupport": true,
+        "InstanceTenancy": "default",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/DemoVPC"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/Resource"
+      }
+    },
+    "DemoVPCPublicSubnetSubnet1SubnetE7E2E2C7": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.1.0/28",
+        "VpcId": {
+          "Ref": "DemoVPC2409DB3F"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PublicSubnet"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public"
+          },
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet1"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W33",
+              "reason": "Need public IP for demo web server "
+            }
+          ]
+        }
+      }
+    },
+    "DemoVPCPublicSubnetSubnet1RouteTableF5662CA6": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "DemoVPC2409DB3F"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet1"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet1/RouteTable"
+      }
+    },
+    "DemoVPCPublicSubnetSubnet1RouteTableAssociation7252A734": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "DemoVPCPublicSubnetSubnet1RouteTableF5662CA6"
+        },
+        "SubnetId": {
+          "Ref": "DemoVPCPublicSubnetSubnet1SubnetE7E2E2C7"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet1/RouteTableAssociation"
+      }
+    },
+    "DemoVPCPublicSubnetSubnet1DefaultRoute1819992F": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "DemoVPCPublicSubnetSubnet1RouteTableF5662CA6"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "DemoVPCIGWD7695CC8"
+        }
+      },
+      "DependsOn": [
+        "DemoVPCVPCGW5132360C"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet1/DefaultRoute"
+      }
+    },
+    "DemoVPCPublicSubnetSubnet2Subnet76AD93EC": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.0.1.16/28",
+        "VpcId": {
+          "Ref": "DemoVPC2409DB3F"
+        },
+        "AvailabilityZone": {
+          "Fn::Select": [
+            1,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "aws-cdk:subnet-name",
+            "Value": "PublicSubnet"
+          },
+          {
+            "Key": "aws-cdk:subnet-type",
+            "Value": "Public"
+          },
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet2"
+          }
+        ]
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W33",
+              "reason": "Need public IP for demo web server "
+            }
+          ]
+        }
+      }
+    },
+    "DemoVPCPublicSubnetSubnet2RouteTable594A88B6": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "DemoVPC2409DB3F"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet2"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet2/RouteTable"
+      }
+    },
+    "DemoVPCPublicSubnetSubnet2RouteTableAssociationC19F7BE2": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "DemoVPCPublicSubnetSubnet2RouteTable594A88B6"
+        },
+        "SubnetId": {
+          "Ref": "DemoVPCPublicSubnetSubnet2Subnet76AD93EC"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet2/RouteTableAssociation"
+      }
+    },
+    "DemoVPCPublicSubnetSubnet2DefaultRouteB31ED9E7": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "DemoVPCPublicSubnetSubnet2RouteTable594A88B6"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "DemoVPCIGWD7695CC8"
+        }
+      },
+      "DependsOn": [
+        "DemoVPCVPCGW5132360C"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/PublicSubnetSubnet2/DefaultRoute"
+      }
+    },
+    "DemoVPCIGWD7695CC8": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/DemoVPC"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/IGW"
+      }
+    },
+    "DemoVPCVPCGW5132360C": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "VpcId": {
+          "Ref": "DemoVPC2409DB3F"
+        },
+        "InternetGatewayId": {
+          "Ref": "DemoVPCIGWD7695CC8"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoVPC/VPCGW"
+      }
+    },
+    "VPCFlowLogGroup9559E1E7": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/VPCFlowLogGroup/Resource"
+      }
+    },
+    "flowRole5E4EF2F1": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "vpc-flow-logs.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/flowRole/Resource"
+      }
+    },
+    "flowRoleDefaultPolicyA5122836": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:CreateLogStream",
+                "logs:PutLogEvents",
+                "logs:DescribeLogStreams"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "VPCFlowLogGroup9559E1E7",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "iam:PassRole",
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "flowRole5E4EF2F1",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "flowRoleDefaultPolicyA5122836",
+        "Roles": [
+          {
+            "Ref": "flowRole5E4EF2F1"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/flowRole/DefaultPolicy/Resource"
+      }
+    },
+    "DemoFlowLogEF3D69D3": {
+      "Type": "AWS::EC2::FlowLog",
+      "Properties": {
+        "ResourceId": {
+          "Ref": "DemoVPC2409DB3F"
+        },
+        "ResourceType": "VPC",
+        "TrafficType": "ALL",
+        "DeliverLogsPermissionArn": {
+          "Fn::GetAtt": [
+            "flowRole5E4EF2F1",
+            "Arn"
+          ]
+        },
+        "LogDestinationType": "cloud-watch-logs",
+        "LogGroupName": {
+          "Ref": "VPCFlowLogGroup9559E1E7"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/DemoFlowLog/FlowLog"
+      }
+    },
+    "FlowLogSubscription": {
+      "Type": "AWS::Logs::SubscriptionFilter",
+      "Properties": {
+        "DestinationArn": {
+          "Ref": "CWDestinationParm"
+        },
+        "FilterPattern": {
+          "Fn::FindInMap": [
+            "FilterPatternLookup",
+            "FlowLogs",
+            "Pattern"
+          ]
+        },
+        "LogGroupName": {
+          "Ref": "VPCFlowLogGroup9559E1E7"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/FlowLogSubscription"
+      }
+    },
+    "WebServerDemoSGABCFDBC1": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "CL-PrimaryStack/CL-DemoStack/WebServer/DemoSG",
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "Allow all outbound traffic by default",
+            "IpProtocol": "-1"
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "Description": "allow HTTP traffic",
+            "FromPort": 80,
+            "IpProtocol": "tcp",
+            "ToPort": 80
+          }
+        ],
+        "VpcId": {
+          "Ref": "DemoVPC2409DB3F"
+        }
+      },
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W40",
+              "reason": "Demo resource"
+            },
+            {
+              "id": "W5",
+              "reason": "Demo resource"
+            },
+            {
+              "id": "W9",
+              "reason": "Demo resource"
+            },
+            {
+              "id": "W2",
+              "reason": "Demo resource"
+            }
+          ]
+        }
+      }
+    },
+    "WebServerEC2LogGroup6CBAD985": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/WebServer/EC2LogGroup/Resource"
+      }
+    },
+    "WebServerDemoEC2InstanceRoleF681DFE4": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "ec2.",
+                      {
+                        "Ref": "AWS::URLSuffix"
+                      }
+                    ]
+                  ]
+                }
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/WebServer/DemoEC2"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/WebServer/DemoEC2/InstanceRole/Resource"
+      }
+    },
+    "WebServerDemoEC2InstanceRoleDefaultPolicy9F7FC8A8": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "cloudformation:DescribeStackResource",
+                "cloudformation:SignalResource"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Ref": "AWS::StackId"
+              }
+            },
+            {
+              "Action": [
+                "logs:Create*",
+                "logs:PutLogEvents"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "WebServerEC2LogGroup6CBAD985",
+                  "Arn"
+                ]
+              },
+              "Sid": "LogWrite"
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "WebServerDemoEC2InstanceRoleDefaultPolicy9F7FC8A8",
+        "Roles": [
+          {
+            "Ref": "WebServerDemoEC2InstanceRoleF681DFE4"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/WebServer/DemoEC2/InstanceRole/DefaultPolicy/Resource"
+      }
+    },
+    "WebServerDemoEC2InstanceProfileFA4B59C6": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Roles": [
+          {
+            "Ref": "WebServerDemoEC2InstanceRoleF681DFE4"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/WebServer/DemoEC2/InstanceProfile"
+      }
+    },
+    "WebServerDemoEC2F5BEF58E": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "AvailabilityZone": {
+          "Fn::Select": [
+            0,
+            {
+              "Fn::GetAZs": ""
+            }
+          ]
+        },
+        "IamInstanceProfile": {
+          "Ref": "WebServerDemoEC2InstanceProfileFA4B59C6"
+        },
+        "ImageId": {
+          "Ref": "LinuxAMI"
+        },
+        "InstanceType": "t3.micro",
+        "SecurityGroupIds": [
+          {
+            "Fn::GetAtt": [
+              "WebServerDemoSGABCFDBC1",
+              "GroupId"
+            ]
+          }
+        ],
+        "SubnetId": {
+          "Ref": "DemoVPCPublicSubnetSubnet1SubnetE7E2E2C7"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "CL-PrimaryStack/CL-DemoStack/WebServer/DemoEC2"
+          }
+        ],
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash\n# fingerprint: b6cc88175f81bf2f\n(\n  set +e\n  /opt/aws/bin/cfn-init -v --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                " --stack ",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                " --resource WebServerDemoEC2F5BEF58E -c default\n  /opt/aws/bin/cfn-signal -e $? --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                " --stack ",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                " --resource WebServerDemoEC2F5BEF58E\n  cat /var/log/cfn-init.log >&2\n)\n/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a stop\n/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/tmp/cw-config.json -s\ncurl 127.0.0.1"
+              ]
+            ]
+          }
+        }
+      },
+      "DependsOn": [
+        "WebServerDemoEC2InstanceRoleDefaultPolicy9F7FC8A8",
+        "WebServerDemoEC2InstanceRoleF681DFE4"
+      ],
+      "CreationPolicy": {
+        "ResourceSignal": {
+          "Count": 1,
+          "Timeout": "PT5M"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/WebServer/DemoEC2/Resource",
+        "AWS::CloudFormation::Init": {
+          "configSets": {
+            "default": [
+              "config"
+            ]
+          },
+          "config": {
+            "packages": {
+              "yum": {
+                "httpd": [],
+                "php": [],
+                "amazon-cloudwatch-agent": []
+              }
+            },
+            "files": {
+              "/tmp/cw-config.json": {
+                "content": {
+                  "agent": {
+                    "run_as_user": "root"
+                  },
+                  "logs": {
+                    "logs_collected": {
+                      "files": {
+                        "collect_list": [
+                          {
+                            "file_path": "/var/log/httpd/access_log",
+                            "log_group_name": {
+                              "Ref": "WebServerEC2LogGroup6CBAD985"
+                            },
+                            "log_stream_name": "{instance_id}/apache.log",
+                            "timezone": "UTC"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "mode": "000644",
+                "owner": "root",
+                "group": "root"
+              },
+              "/var/www/html/index.php": {
+                "content": "<?php\n        echo '<h1>AWS CloudFormation sample PHP application</h1>';\n        ?>",
+                "encoding": "plain",
+                "mode": "000644",
+                "owner": "apache",
+                "group": "apache"
+              }
+            },
+            "services": {
+              "sysvinit": {
+                "httpd": {
+                  "enabled": true,
+                  "ensureRunning": true,
+                  "files": [
+                    "/var/www/html/index.php"
+                  ],
+                  "packages": {
+                    "yum": [
+                      "httpd",
+                      "php",
+                      "amazon-cloudwatch-agent"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "WebServerWebServerSubscription7595409C": {
+      "Type": "AWS::Logs::SubscriptionFilter",
+      "Properties": {
+        "DestinationArn": {
+          "Ref": "CWDestinationParm"
+        },
+        "FilterPattern": "[host, ident, authuser, date, request, status, bytes, referrer, agent]",
+        "LogGroupName": {
+          "Ref": "WebServerEC2LogGroup6CBAD985"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/WebServer/WebServerSubscription"
+      }
+    },
+    "CloudTrailLogGroup343A29D6": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "RetentionInDays": 7
+      },
+      "UpdateReplacePolicy": "Delete",
+      "DeletionPolicy": "Delete",
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/CloudTrailLogGroup/Resource"
+      }
+    },
+    "TrailBucketA831CE63": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        }
+      },
+      "UpdateReplacePolicy": "Retain",
+      "DeletionPolicy": "Retain",
+      "Metadata": {
+        "cfn_nag": {
+          "rules_to_suppress": [
+            {
+              "id": "W35",
+              "reason": "Demo resource"
+            },
+            {
+              "id": "W41",
+              "reason": "Demo resource, no production data"
+            }
+          ]
+        }
+      }
+    },
+    "TrailBucketPolicyFEBC3C5C": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "TrailBucketA831CE63"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:GetBucketAcl",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TrailBucketA831CE63",
+                  "Arn"
+                ]
+              },
+              "Sid": "CloudTrailRead"
+            },
+            {
+              "Action": "s3:PutObject",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "TrailBucketA831CE63",
+                        "Arn"
+                      ]
+                    },
+                    "/AWSLogs/",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    "/*"
+                  ]
+                ]
+              },
+              "Sid": "CloudTrailWrite"
+            },
+            {
+              "Action": "s3:GetBucketAcl",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::GetAtt": [
+                  "TrailBucketA831CE63",
+                  "Arn"
+                ]
+              }
+            },
+            {
+              "Action": "s3:PutObject",
+              "Condition": {
+                "StringEquals": {
+                  "s3:x-amz-acl": "bucket-owner-full-control"
+                }
+              },
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              },
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "TrailBucketA831CE63",
+                        "Arn"
+                      ]
+                    },
+                    "/AWSLogs/",
+                    {
+                      "Ref": "AWS::AccountId"
+                    },
+                    "/*"
+                  ]
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/TrailBucket/Policy/Resource"
+      }
+    },
+    "demoTrailLogsRole36F2CC79": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "cloudtrail.amazonaws.com"
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/demoTrail/LogsRole/Resource"
+      }
+    },
+    "demoTrailLogsRoleDefaultPolicy6D349A19": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": [
+                "logs:PutLogEvents",
+                "logs:CreateLogStream"
+              ],
+              "Effect": "Allow",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "CloudTrailLogGroup343A29D6",
+                  "Arn"
+                ]
+              }
+            }
+          ],
+          "Version": "2012-10-17"
+        },
+        "PolicyName": "demoTrailLogsRoleDefaultPolicy6D349A19",
+        "Roles": [
+          {
+            "Ref": "demoTrailLogsRole36F2CC79"
+          }
+        ]
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/demoTrail/LogsRole/DefaultPolicy/Resource"
+      }
+    },
+    "demoTrailF7F7A854": {
+      "Type": "AWS::CloudTrail::Trail",
+      "Properties": {
+        "IsLogging": true,
+        "S3BucketName": {
+          "Ref": "TrailBucketA831CE63"
+        },
+        "CloudWatchLogsLogGroupArn": {
+          "Fn::GetAtt": [
+            "CloudTrailLogGroup343A29D6",
+            "Arn"
+          ]
+        },
+        "CloudWatchLogsRoleArn": {
+          "Fn::GetAtt": [
+            "demoTrailLogsRole36F2CC79",
+            "Arn"
+          ]
+        },
+        "EnableLogFileValidation": true,
+        "EventSelectors": [],
+        "IncludeGlobalServiceEvents": true,
+        "IsMultiRegionTrail": false
+      },
+      "DependsOn": [
+        "demoTrailLogsRoleDefaultPolicy6D349A19",
+        "demoTrailLogsRole36F2CC79",
+        "TrailBucketPolicyFEBC3C5C"
+      ],
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/demoTrail/Resource"
+      }
+    },
+    "CloudTrailSubscription": {
+      "Type": "AWS::Logs::SubscriptionFilter",
+      "Properties": {
+        "DestinationArn": {
+          "Ref": "CWDestinationParm"
+        },
+        "FilterPattern": {
+          "Fn::FindInMap": [
+            "FilterPatternLookup",
+            "CloudTrail",
+            "Pattern"
+          ]
+        },
+        "LogGroupName": {
+          "Ref": "CloudTrailLogGroup343A29D6"
+        }
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/CloudTrailSubscription"
+      }
+    },
+    "CDKMetadata": {
+      "Type": "AWS::CDK::Metadata",
+      "Properties": {
+        "Modules": "aws-cdk=1.74.0,@aws-cdk/assets=1.74.0,@aws-cdk/aws-apigateway=1.74.0,@aws-cdk/aws-applicationautoscaling=1.74.0,@aws-cdk/aws-autoscaling-common=1.74.0,@aws-cdk/aws-cloudtrail=1.74.0,@aws-cdk/aws-cloudwatch=1.74.0,@aws-cdk/aws-cloudwatch-actions=1.74.0,@aws-cdk/aws-codeguruprofiler=1.74.0,@aws-cdk/aws-cognito=1.74.0,@aws-cdk/aws-ec2=1.74.0,@aws-cdk/aws-elasticsearch=1.74.0,@aws-cdk/aws-events=1.74.0,@aws-cdk/aws-iam=1.74.0,@aws-cdk/aws-kinesis=1.74.0,@aws-cdk/aws-kinesisfirehose=1.74.0,@aws-cdk/aws-kms=1.74.0,@aws-cdk/aws-lambda=1.74.0,@aws-cdk/aws-lambda-event-sources=1.74.0,@aws-cdk/aws-logs=1.74.0,@aws-cdk/aws-s3=1.74.0,@aws-cdk/aws-s3-assets=1.74.0,@aws-cdk/aws-s3-notifications=1.74.0,@aws-cdk/aws-sam=1.74.0,@aws-cdk/aws-secretsmanager=1.74.0,@aws-cdk/aws-sns=1.74.0,@aws-cdk/aws-sns-subscriptions=1.74.0,@aws-cdk/aws-sqs=1.74.0,@aws-cdk/aws-ssm=1.74.0,@aws-cdk/cloud-assembly-schema=1.74.0,@aws-cdk/core=1.74.0,@aws-cdk/custom-resources=1.74.0,@aws-cdk/cx-api=1.74.0,@aws-cdk/region-info=1.74.0,jsii-runtime=node.js/v10.19.0"
+      },
+      "Metadata": {
+        "aws:cdk:path": "CL-PrimaryStack/CL-DemoStack/CDKMetadata/Default"
+      },
+      "Condition": "CDKMetadataAvailable"
+    }
+  },
+  "Outputs": {
+    "DestinationArn": {
+      "Description": "CloudWatch Logs destination arn",
+      "Value": {
+        "Ref": "CWDestinationParm"
+      }
+    },
+    "URL": {
+      "Description": "URL for demo web server",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "http://",
+            {
+              "Fn::GetAtt": [
+                "WebServerDemoEC2F5BEF58E",
+                "PublicIp"
+              ]
+            }
+          ]
+        ]
+      }
+    }
+  },
+  "Conditions": {
+    "CDKMetadataAvailable": {
+      "Fn::Or": [
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-northeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ap-southeast-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "ca-central-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "cn-northwest-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-central-1"
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Or": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-north-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "eu-west-3"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "me-south-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "sa-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-east-2"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-west-1"
+              ]
+            },
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "AWS::Region"
+                },
+                "us-west-2"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
