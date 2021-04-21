@@ -23,9 +23,9 @@ _Note:_ For any relavant information outside the scope of this readme, please re
 
 ## Installing pre-packaged solution template
 
-- Primary Template: [aws-centralized-logging.template](https://solutions-reference.s3.amazonaws.com/centralized-logging/latest/aws-centralized-logging.template)
+- Primary Template: [aws-centralized-logging.template](./templates/aws-centralized-logging.template)
 
-- Demo Template: [Demo.template](https://solutions-reference.s3.amazonaws.com/centralized-logging/latest/aws-centralized-logging-demo.template)
+- Demo Template: [Demo.template](./templates/aws-centralized-logging-demo.template)
 
 ## Customization
 
