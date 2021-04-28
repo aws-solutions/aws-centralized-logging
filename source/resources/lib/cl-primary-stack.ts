@@ -91,6 +91,7 @@ import { Queue, QueueEncryption } from "@aws-cdk/aws-sqs";
 import { Topic } from "@aws-cdk/aws-sns";
 import { Alias, IAlias } from "@aws-cdk/aws-kms";
 import { EmailSubscription } from "@aws-cdk/aws-sns-subscriptions";
+import path from 'path';
 
 enum LogLevel {
   ERROR = "error",
@@ -388,7 +389,12 @@ export class CLPrimary extends Stack {
         SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
       },
       handler: "index.handler",
-      code: Code.fromAsset("../../source/services/helper/dist/cl-helper.zip"),
+      code: Code.fromAsset(
+        path.join(
+          __dirname, 
+          "../../services/helper/dist/cl-helper.zip"
+        )
+      ),
       runtime: Runtime.NODEJS_12_X,
       timeout: Duration.seconds(300),
       role: helperRole,
@@ -827,7 +833,10 @@ export class CLPrimary extends Stack {
       },
       handler: "index.handler",
       code: Code.fromAsset(
-        "../../source/services/transformer/dist/cl-transformer.zip"
+        path.join(
+          __dirname,
+          "../../services/transformer/dist/cl-transformer.zip"
+        )
       ),
       runtime: Runtime.NODEJS_12_X,
       timeout: Duration.seconds(300),
