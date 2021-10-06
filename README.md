@@ -137,3 +137,136 @@ AWS Centralized Logging solution consists of:
 ## License
 
 See license [here](./LICENSE.txt)
+
+## Manifest.json it contains runtime configuration
+
+{
+"solutionId": "SO0009",
+"metricsEndpoint": "https://metrics.awssolutionsbuilder.com/generic",
+"solutionName": "%%SOLUTION_NAME%%",
+"templateVersion": "2010-09-09",
+"solutionVersion": "%%VERSION%%",
+"sendMetric": "Yes",
+"streamName": "CL-KinesisStream",
+"firehoseName": "CL-Firehose",
+"cwDestinationName": "CL-Destination",
+"firehosePolicy": "CL-Firehose-Policy",
+"jumpboxInstanceType": "t3.micro",
+"esdomain": {
+"vpcCIDR": "10.0.0.0/16",
+"masterNodes": 3
+},
+"kinesisDataStream": {
+"shard": 1,
+"retentionInHrs": 24
+}
+}
+
+## Steps to run:
+
+Prerequisite:
+
+- Ensure AWS CLI is install and configure the profile
+- CDK is install
+  npm install -g aws-cdk
+
+  Steps to execute the code for master log/ELK Account:
+
+3.  Good to run with ubuntu box with nodejs-10/12
+4.  Open project and run following command
+    npm i
+    npm run prettier-format
+    npm run lint
+5.  Run npm run build . it will create zip file for both service and transformer lambda
+6.  Once build is successful, go to resources folder cd source/resources
+7.  Run npm i
+8.  After completion of npm i, go to bin folder; cd bin
+9.  Create key pair from AWS Console->EC2->Left side menu Key pairs and put this key pair name in bellow command
+10. Run following command:
+
+- cdk bootstrap --profile <PROFILE_NAME> [it will do CDK bootstrapping and create bootstrap stack]
+- cdk synth CL-PrimaryStack [ it will do synth of primary stack and show complete cloudformation template]
+- cdk deploy CL-PrimaryStack --parameters AdminEmail=<EMAIL> --parameters SpokeAccounts=<ACCOUNT-ID-1,ACCOUNT-ID-2...> --parameters JumpboxKey=<EC2_KEY_PAIR> --parameters JumpboxDeploy='Yes' --profile <PROFILE_NAME>
+
+  [Put the key pair name to this EC2_Key_Pair, Admin email is the Administrator access of Kibana Dashboard and master Email]
+
+  ## Customization of command to create stack:
+
+  ClusterSize:
+  "Elasticsearch cluster size; small (4 data nodes), medium (6 data nodes), large (6 data nodes)",
+  type: "String",
+  default: "Small",
+  allowedValues: ["Small", "Medium", "Large"],
+
+  const esMap = new CfnMapping(this, "ESMap", {
+  mapping: {
+  NodeCount: {
+  Small: 4,
+  Medium: 6,
+  Large: 6,
+  },
+  MasterSize: {
+  Small: "c5.large.elasticsearch",
+  Medium: "c5.large.elasticsearch",
+  Large: "c5.large.elasticsearch",
+  },
+  InstanceSize: {
+  Small: "r5.large.elasticsearch",
+  Medium: "r5.2xlarge.elasticsearch",
+  Large: "r5.4xlarge.elasticsearch",
+  },
+  },
+  });
+
+  /\*\*
+
+  - @description Option to deploy demo template
+  - @type {CfnParameter}
+    \*/
+    const demoTemplate: CfnParameter = new CfnParameter(this, "DemoTemplate", {
+    description: "Deploy demo template for sample data and logs?",
+    type: "String",
+    default: "No",
+    allowedValues: ["No", "Yes"],
+    });
+
+  /\*\*
+
+  - @description List of spoke account ids
+  - @type {CfnParameter}
+    \*/
+    const spokeAccts: CfnParameter = new CfnParameter(this, "SpokeAccounts", {
+    description:
+    "Account IDs which you want to allow for centralized logging (comma separated list eg. 11111111,22222222)",
+    type: "CommaDelimitedList",
+    });
+
+  /\*\*
+
+  - @regions List of regions for CW Logs Destination
+  - @type {CfnParameter}
+    \*/
+    const spokeRegions: CfnParameter = new CfnParameter(this, "SpokeRegions", {
+    description:
+    "Regions which you want to allow for centralized logging (comma separated list eg. us-east-1,us-west-2)",
+    type: "CommaDelimitedList",
+    default: "All",
+    });
+
+  11. Once deploy command is successful, it will create windows instance and allow 443 port to access Kibana URL is tunneling
+
+## Spoke Account- Transfer log from application to Log account:
+
+Steps:
+
+1. Need create subscription filter for each group
+2. Copy the command from cloudformation stack, command can be found on this: CL-PrimaryStack.DestinationSubscriptionCommand
+3. Run the following command to create group subscription
+   aws logs put-subscription-filter --destination-arn arn:aws:logs:<region>:XXXXXXX:destination:CL-Destination --log-group-name <MyLogGroup> --filter-name <MyFilterName> --filter-pattern <MyFilterPattern> --profile <MyAWSProfile>
+4. Take some time to transfer log
+5. Check Kibana Dashboard
+
+## Kibana:
+
+1. Create Index at Kibana Dashboard based on the application log type
+2. For Cloud-watch log index : cl-w-\*
