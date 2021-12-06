@@ -15,6 +15,5 @@ This software includes third party software subject to the following copyrights:
 aws-sdk under Apache License 2.0
 aws-cdk under Apache License 2.0
 got under MIT License
-moment under MIT License
 uuid under MIT License
 winston under MIT License

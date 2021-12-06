@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
  *  with the License. A copy of the License is located at
@@ -11,9 +11,8 @@
  *  and limitations under the License.
  */
 import { v4 as uuidv4 } from "uuid";
-import { logger } from "./lib/common/logger";
-import { Metrics } from "./lib/common/metrics";
-import moment from "moment";
+import { logger } from "logger";
+import { Metrics } from "metrics";
 import { CloudWatchLogs, EC2, IAM } from "aws-sdk";
 
 interface IEvent {
@@ -33,6 +32,10 @@ const awsClients = {
   iam: "2010-05-08",
 };
 
+interface IResponse {
+  responseData: { [key: string]: unknown };
+  status: string;
+}
 /**
  * @description entry point for helper function
  * @param {IEvent} event invoking event
@@ -44,88 +47,184 @@ exports.handler = async (event: IEvent, context: any) => {
     message: `received event: ${JSON.stringify(event)}`,
   });
 
-  let responseData: any = {
-    Data: "NOV",
-  };
-  let status = "SUCCESS";
-
   const properties = event.ResourceProperties;
 
-  if (event.ResourceType === "Custom::CreateUUID") {
-    // generate uuid
-    if (event.RequestType === "Create") {
-      responseData = {
-        UUID: uuidv4(),
-      };
-      logger.info({
-        label: "helper/UUID",
-        message: `uuid create: ${responseData.UUID}`,
-      });
-    }
-  } else if (event.ResourceType === "Custom::CreateESServiceRole") {
-    // create service linked role for es
-    if (event.RequestType === "Create") {
-      const iam = new IAM({ apiVersion: awsClients.iam });
-      try {
-        await iam
-          .createServiceLinkedRole({ AWSServiceName: "es.amazonaws.com" })
-          .promise();
-        logger.info({
-          label: "helper/CreateESServiceRole",
-          message: `es service linked role created`,
-        });
-      } catch (e) {
-        logger.error({
-          label: "helper/createServiceLinkedRole",
-          message: `${JSON.stringify(e)}`,
-        });
-        if (e.code === "InvalidInput") {
-          logger.warn({
-            label: "helper/createServiceLinkedRole",
-            message: `needed ES service linked role already exists ${e.message}`,
-          });
-        } else {
-          logger.error({
-            label: "helper/createServiceLinkedRole",
-            message: `${e.message}`,
-          });
-          responseData = {
-            Error:
-              "failed to create ES service linked role, please see in cw logs for more details",
-          };
-          status = "FAILED";
-        }
-      }
-    }
-  } else if (event.ResourceType === "Custom::CWDestination") {
-    // fetching regions
-    let allRegions: any;
-    try {
-      allRegions = await getRegions();
-    } catch (e) {
-      logger.error({
-        label: "helper/CWDestination",
-        message: `${e.message}`,
-      });
-      responseData = {
-        Error: "failed to get regions, please see in cw logs for more details",
-      };
-      status = "FAILED";
-      return await sendResponse(
-        event,
-        context.logStreamName,
-        status,
-        responseData
-      );
-    }
+  /**
+   * handle UUID
+   */
+  if (
+    event.ResourceType === "Custom::CreateUUID" &&
+    event.RequestType === "Create"
+  ) {
+    const { responseData, status } = createUUID();
+    // send response to custom resource
+    return sendResponse(event, context.logStreamName, status, responseData);
+  }
 
-    // create regional destinations
-    if (event.RequestType === "Create" || event.RequestType === "Update") {
-      // create/update destinations
+  /**
+   * handle ES Service role
+   */
+  if (
+    event.ResourceType === "Custom::CreateESServiceRole" &&
+    event.RequestType === "Create"
+  ) {
+    const { responseData, status } = await createESRole();
+    // send response to custom resource
+    return sendResponse(event, context.logStreamName, status, responseData);
+  }
+
+  /**
+   * handle launch data
+   */
+  if (
+    event.ResourceType === "Custom::LaunchData" &&
+    process.env.SEND_METRIC === "Yes"
+  ) {
+    const { responseData, status } = await sendData(
+      properties,
+      event.RequestType
+    );
+    // send response to custom resource
+    return sendResponse(event, context.logStreamName, status, responseData);
+  }
+
+  /**
+   * handle CW destinations
+   */
+
+  if (event.ResourceType === "Custom::CWDestination") {
+    const { responseData, status } = await crudDestinations(
+      properties,
+      event.RequestType
+    );
+    // send response to custom resource
+    return sendResponse(event, context.logStreamName, status, responseData);
+  }
+
+  /**
+   * default
+   */
+  // send response to custom resource
+  return sendResponse(event, context.logStreamName, "SUCCESS", {
+    Data: "no data",
+  });
+};
+
+/**
+ * @description create UUID for customer deployment
+ * @returns
+ */
+const createUUID = (): IResponse => {
+  const responseData = { UUID: uuidv4() };
+  const status = "SUCCESS";
+  logger.info({
+    label: "helper/createUUID",
+    message: `uuid create: ${responseData.UUID}`,
+  });
+  return { responseData, status };
+};
+
+/**
+ * @description create ES service linked role
+ * @returns
+ */
+
+const createESRole = async (): Promise<IResponse> => {
+  const iam = new IAM({
+    apiVersion: awsClients.iam,
+    customUserAgent: process.env.CUSTOM_SDK_USER_AGENT,
+  });
+
+  let responseData: {
+    [key: string]: string;
+  } = { Data: "no data" };
+  let status = "SUCCESS";
+
+  await iam
+    .createServiceLinkedRole({ AWSServiceName: "es.amazonaws.com" })
+    .promise()
+    .catch((e) => {
+      logger.error({
+        label: "helper/createESRole",
+        message: e,
+      });
+      if ((e as Error).name !== "InvalidInput") {
+        // InvalidInput ES service linked role already exists
+        responseData = {
+          Error:
+            "failed to create ES service linked role, please see in cw logs for more details",
+        };
+        status = "FAILED";
+      }
+      return { responseData, status };
+    });
+  logger.info({
+    label: "helper/createESRole",
+    message: `es service linked role created`,
+  });
+  return { responseData, status };
+};
+
+/**
+ * @description send launch data
+ * @returns
+ */
+const sendData = async (
+  properties: any,
+  requestType: string
+): Promise<IResponse> => {
+  logger.debug({
+    label: "helper/sendData",
+    message: `sending launch data`,
+  });
+  const eventType = `Solution${requestType}`; // SolutionCreate or SolutionDelete
+  const metric = {
+    Solution: properties.SolutionId,
+    UUID: properties.SolutionUuid,
+    TimeStamp: new Date().toISOString().replace("T", " ").replace("Z", ""), // Date and time instant in a java.sql.Timestamp compatible format,
+    Data: {
+      Event: eventType,
+      Stack: properties.Stack,
+      Version: properties.SolutionVersion,
+    },
+  };
+  await Metrics.sendAnonymousMetric(
+    <string>process.env.METRICS_ENDPOINT,
+    metric
+  );
+
+  return {
+    responseData: {
+      Data: metric,
+    },
+    status: "SUCCESS",
+  };
+};
+
+/**
+ * @description crud for cw destinations
+ * @returns
+ */
+const crudDestinations = async (
+  properties: any,
+  requestType: string
+): Promise<IResponse> => {
+  let responseData: {
+    [key: string]: string;
+  } = { Data: "no data" };
+  let status = "SUCCESS";
+  try {
+    const allRegions = await getRegions();
+
+    // delete destinations
+    if (requestType === "Delete")
+      await deleteDestination(properties.DestinationName, allRegions);
+    // create/update destinations
+    else {
       let spokeRegions = properties.Regions;
       logger.debug({
         label: "helper/CWDestination",
-        message: `Regions to ${event.RequestType} CloudWatch destinations: ${spokeRegions}`,
+        message: `Regions to ${requestType} CloudWatch destinations: ${spokeRegions}`,
       });
       if (spokeRegions[0] === "All") {
         spokeRegions = allRegions;
@@ -137,68 +236,25 @@ exports.handler = async (event: IEvent, context: any) => {
         properties.Role,
         properties.DataStream,
         properties.SpokeAccounts
-      ).catch(() => {
-        responseData = {
-          Error:
-            "failed to put cw logs destinations, please see in cw logs for more details",
-        };
-        status = "FAILED";
-      });
-    }
-    if (event.RequestType === "Delete") {
-      // delete destinations
-      await deleteDestination(properties.DestinationName, allRegions).catch(
-        (e) => {
-          logger.warn({
-            label: "helper/deleteDestination",
-            message: `${e.message}`,
-          });
-        }
       );
     }
-  } else if (event.ResourceType === "Custom::LaunchData") {
-    // send metric for launch
-    if (process.env.SEND_METRIC === "Yes") {
-      logger.info({
-        label: "helper/LaunchData",
-        message: `sending launch data`,
-      });
-      let eventType = "";
-      if (event.RequestType === "Create") {
-        eventType = "SolutionLaunched";
-      } else if (event.RequestType === "Delete") {
-        eventType = "SolutionDeleted";
-      }
-
-      const metric = {
-        Solution: properties.SolutionId,
-        UUID: properties.SolutionUuid,
-        TimeStamp: moment.utc().format("YYYY-MM-DD HH:mm:ss.S"),
-        Data: {
-          Event: eventType,
-          Stack: properties.Stack,
-          Version: properties.SolutionVersion,
-        },
-      };
-      await Metrics.sendAnonymousMetric(
-        <string>process.env.METRICS_ENDPOINT,
-        metric
-      );
-
-      responseData = {
-        Data: metric,
-      };
-    }
+  } catch (e) {
+    logger.error({
+      label: "helper/CWDestination",
+      message: e,
+    });
+    responseData = {
+      Error: `failed to ${requestType} CW destinations, please see in cw logs for more details`,
+    };
+    status = "FAILED";
   }
-
-  // send response to custom resource
-  return await sendResponse(event, context.logStreamName, status, responseData);
+  return { responseData, status };
 };
 
 /**
  * @description get list of ec2 regions
  */
-async function getRegions() {
+async function getRegions(): Promise<string[]> {
   logger.info({
     label: "helper/getRegions",
     message: `getting ec2 regions`,
@@ -206,15 +262,12 @@ async function getRegions() {
   try {
     const ec2 = new EC2({
       apiVersion: awsClients.ec2,
+      customUserAgent: process.env.CUSTOM_SDK_USER_AGENT,
     });
-
     const _r = await ec2.describeRegions().promise();
-
     if (!_r.Regions) throw new Error("failed to describe regions");
 
-    const regions = _r.Regions.filter((region) => {
-      return region.RegionName !== "ap-northeast-3";
-    }).map((region) => {
+    const regions = <string[]>_r.Regions.map((region) => {
       return region.RegionName;
     });
     logger.debug({
@@ -227,7 +280,7 @@ async function getRegions() {
       label: "helper/getRegions",
       message: e,
     });
-    throw new Error("error fetching regions");
+    throw new Error("error in getting regions");
   }
 }
 
@@ -266,6 +319,7 @@ async function putDestination(
           const cwLogs = new CloudWatchLogs({
             apiVersion: awsClients.cwLogs,
             region: region,
+            customUserAgent: process.env.CUSTOM_SDK_USER_AGENT,
           });
 
           //put destination
@@ -329,42 +383,34 @@ async function deleteDestination(destinationName: string, regions: string[]) {
     label: "helper/deleteDestination",
     message: `deleting cw logs destinations `,
   });
-  try {
-    await Promise.allSettled(
-      regions.map(async (region) => {
-        const cwLogs = new CloudWatchLogs({
-          apiVersion: awsClients.cwLogs,
-          region: region,
-        });
-        await cwLogs
-          .deleteDestination({ destinationName: destinationName })
-          .promise()
-          .then(() => {
-            logger.debug({
-              label: "helper/deleteDestination",
-              message: `cw logs destination deleted in ${region}`,
-            });
-          })
-          .catch((e) => {
-            logger.warn({
-              label: `helper/deleteDestination`,
-              message: `${region}: ${e.message}`,
-            });
+  await Promise.allSettled(
+    regions.map(async (region) => {
+      const cwLogs = new CloudWatchLogs({
+        apiVersion: awsClients.cwLogs,
+        region: region,
+        customUserAgent: process.env.CUSTOM_SDK_USER_AGENT,
+      });
+      await cwLogs
+        .deleteDestination({ destinationName: destinationName })
+        .promise()
+        .then(() => {
+          logger.debug({
+            label: "helper/deleteDestination",
+            message: `cw logs destination deleted in ${region}`,
           });
-      })
-    );
-    logger.info({
-      label: "helper/deleteDestinations",
-      message: `All cw logs destinations deleted`,
-    });
-    return "cw logs destinations deleted";
-  } catch (e) {
-    logger.warn({
-      label: "helper/deleteDestinations",
-      message: e.message,
-    });
-    throw new Error("error in deleting destinations");
-  }
+        })
+        .catch((e) => {
+          logger.warn({
+            label: `helper/deleteDestination`,
+            message: `${region}: ${(e as Error).message}`,
+          });
+        });
+    })
+  );
+  logger.info({
+    label: "helper/deleteDestinations",
+    message: `All cw logs destinations deleted`,
+  });
 }
 
 /**
@@ -389,7 +435,7 @@ async function areRegionsValid(regions: string[], awsRegions: string[]) {
   } catch (e) {
     logger.error({
       label: "helper/areRegionsValid",
-      message: `${e.message}`,
+      message: `${(e as Error).message}`,
     });
     return false;
   }

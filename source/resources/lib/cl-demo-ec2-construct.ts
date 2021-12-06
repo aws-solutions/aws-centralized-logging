@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
  *  with the License. A copy of the License is located at
@@ -42,6 +42,7 @@ import {
 } from "@aws-cdk/aws-logs";
 import { Effect, PolicyStatement } from "@aws-cdk/aws-iam";
 import manifest from "./manifest.json";
+import { cfn_suppress_rules, applyCfnNagSuppressRules } from "./utils";
 
 /**
  * @interface
@@ -82,28 +83,13 @@ export class EC2Demo extends Construct {
       vpc: props.demoVpc,
     });
     demoSg.addIngressRule(Peer.anyIpv4(), Port.tcp(80), "allow HTTP traffic");
-    (demoSg.node.defaultChild as CfnResource).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W40",
-            reason: "Demo resource",
-          },
-          {
-            id: "W5",
-            reason: "Demo resource",
-          },
-          {
-            id: "W9",
-            reason: "Demo resource",
-          },
-          {
-            id: "W2",
-            reason: "Demo resource",
-          },
-        ],
-      },
-    };
+    // cfn_nag suppress rule
+    applyCfnNagSuppressRules(demoSg.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W5,
+      cfn_suppress_rules.W2,
+      cfn_suppress_rules.W9,
+      cfn_suppress_rules.W40,
+    ]);
 
     /**
      * @description log group for web server
@@ -206,5 +192,10 @@ export class EC2Demo extends Construct {
         "[host, ident, authuser, date, request, status, bytes, referrer, agent]",
       logGroupName: ec2Lg.logGroupName,
     });
+
+    // cfn_nag suppress rule
+    applyCfnNagSuppressRules(ec2Lg.node.findChild("Resource") as CfnResource, [
+      cfn_suppress_rules.W84,
+    ]);
   }
 }

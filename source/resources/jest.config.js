@@ -1,6 +1,6 @@
 module.exports = {
   // Automatically clear mock calls and instances between every test
-  clearMocks: true,
+  clearMocks: false,
 
   // The directory where Jest should output its coverage files
   coverageDirectory: "coverage",
@@ -40,4 +40,9 @@ module.exports = {
 
   // Indicates whether each individual test should be reported during the run
   verbose: true,
+
+  coverageReporters: ["text", ["lcov", { projectRoot: "../../" }]],
+
+  // This option allows the use of a custom results processor.
+  testResultsProcessor: "jest-sonar-reporter",
 };
