@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
  *  with the License. A copy of the License is located at
@@ -51,6 +51,7 @@ import {
 import { Trail } from "@aws-cdk/aws-cloudtrail";
 import { BlockPublicAccess, Bucket, BucketEncryption } from "@aws-cdk/aws-s3";
 import { EC2Demo } from "./cl-demo-ec2-construct";
+import { cfn_suppress_rules, applyCfnNagSuppressRules } from "./utils";
 import manifest from "./manifest.json";
 
 /**
@@ -165,17 +166,9 @@ export class CLDemo extends NestedStack {
       ],
     });
     demoVPC.publicSubnets.forEach((subnet) => {
-      const hs = subnet.node.defaultChild as CfnResource;
-      hs.cfnOptions.metadata = {
-        cfn_nag: {
-          rules_to_suppress: [
-            {
-              id: "W33",
-              reason: "Need public IP for demo web server ",
-            },
-          ],
-        },
-      };
+      applyCfnNagSuppressRules(subnet.node.defaultChild as CfnResource, [
+        cfn_suppress_rules.W33,
+      ]);
     });
 
     //===================
@@ -268,20 +261,6 @@ export class CLDemo extends NestedStack {
         resources: [`${trailBucket.bucketArn}/AWSLogs/${this.account}/*`],
       })
     );
-    (trailBucket.node.defaultChild as CfnResource).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W35",
-            reason: "Demo resource",
-          },
-          {
-            id: "W41",
-            reason: "Demo resource, no production data",
-          },
-        ],
-      },
-    };
 
     /**
      * @description demo trail
@@ -308,6 +287,22 @@ export class CLDemo extends NestedStack {
       ),
       logGroupName: cloudtrailLg.logGroupName,
     });
+
+    //=============================================================================================
+    // cfn_nag suppress rules
+    //=============================================================================================
+    applyCfnNagSuppressRules(trailBucket.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W35,
+    ]);
+
+    applyCfnNagSuppressRules(flowLg.node.findChild("Resource") as CfnResource, [
+      cfn_suppress_rules.W84,
+    ]);
+
+    applyCfnNagSuppressRules(
+      cloudtrailLg.node.findChild("Resource") as CfnResource,
+      [cfn_suppress_rules.W84]
+    );
 
     //=============================================================================================
     // Output

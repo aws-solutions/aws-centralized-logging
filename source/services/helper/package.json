@@ -1,27 +1,31 @@
 {
   "name": "cl-helper",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "helper function for Centralized Logging solution",
   "main": "index.js",
   "scripts": {
-    "pretest": "npm i",
+    "preinstall:logger": "cd ../@aws-solutions/utils/logger && npm ci",
+    "preinstall:metrics": "cd ../@aws-solutions/utils/metrics && npm ci",
+    "preinstall": "npm run preinstall:logger && npm run preinstall:metrics",
     "test": "echo \"nothing to do\"",
-    "build:clean": "rm -rf ./node_modules && rm -rf ./dist && rm -f ./package-lock.json",
-    "build:copy": "cp -r ./node_modules ./dist/node_modules",
-    "build:ts": "./node_modules/typescript/bin/tsc --project ./tsconfig.json",
-    "build:install": "npm i",
     "watch": "tsc -w",
-    "build:zip": "cd ./dist && zip -rq cl-helper.zip .",
-    "build:all": "npm run build:clean && npm run build:install && npm run build:ts && npm prune --production && npm run build:copy && npm run build:zip"
+    "build:clean": "rm -rf ./node_modules && rm -rf ./dist",
+    "build:install": "npm run preinstall && npm ci",
+    "build:ts": "./node_modules/typescript/bin/tsc --project ./tsconfig.json",
+    "prune:logger": "cd ./node_modules/logger && npm prune --production",
+    "prune:metrics": "cd ./node_modules/metrics && npm prune --production",
+    "build:prune": "npm run prune:logger && npm run prune:metrics",
+    "build:copy": "cp -RL ./node_modules ./dist/node_modules && rm -rf ./dist/__tests__",
+    "build:zip": "cd ./dist && zip -r cl-helper.zip .",
+    "build:all": "npm run build:clean && npm run build:install && npm run build:ts && npm run build:prune && npm prune --production && npm run build:copy && npm run build:zip"
   },
   "author": "aws-solutions",
   "license": "Apache-2.0",
   "dependencies": {
-    "got": "^11.5.1",
-    "moment": "^2.27.0",
     "uuid": "^8.2.0",
-    "winston": "^3.3.3",
-    "aws-sdk": "^2.714.0"
+    "aws-sdk": "^2.714.0",
+    "logger": "file:../@aws-solutions/utils/logger",
+    "metrics": "file:../@aws-solutions/utils/metrics"
   },
   "devDependencies": {
     "typescript": "^4.0.2",
