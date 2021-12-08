@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may
  *  not use this file except in compliance with the License. A copy of the
@@ -29,15 +29,10 @@ import {
   Vpc,
 } from "@aws-cdk/aws-ec2";
 import { SnsAction } from "@aws-cdk/aws-cloudwatch-actions";
-import {
-  Code,
-  Runtime,
-  Function,
-  CfnFunction,
-  StartingPosition,
-} from "@aws-cdk/aws-lambda";
+import { Code, Runtime, Function, StartingPosition } from "@aws-cdk/aws-lambda";
 import {
   App,
+  Aspects,
   CfnCondition,
   CfnMapping,
   CfnOutput,
@@ -71,9 +66,10 @@ import {
   PolicyDocument,
   PolicyStatement,
   Role,
+  ServicePrincipal,
+  ArnPrincipal,
 } from "@aws-cdk/aws-iam";
 import { Provider } from "@aws-cdk/custom-resources";
-import { ServicePrincipal, ArnPrincipal } from "@aws-cdk/aws-iam";
 import { StreamEncryption, Stream } from "@aws-cdk/aws-kinesis";
 import {
   BlockPublicAccess,
@@ -82,8 +78,6 @@ import {
   BucketEncryption,
 } from "@aws-cdk/aws-s3";
 import { CfnDeliveryStream } from "@aws-cdk/aws-kinesisfirehose";
-import { CLDemo } from "./cl-demo-stack";
-import manifest from "./manifest.json";
 import { LogGroup, LogStream } from "@aws-cdk/aws-logs";
 import { Jumpbox } from "./cl-jumpbox-construct";
 import { KinesisEventSource } from "@aws-cdk/aws-lambda-event-sources";
@@ -91,6 +85,15 @@ import { Queue, QueueEncryption } from "@aws-cdk/aws-sqs";
 import { Topic } from "@aws-cdk/aws-sns";
 import { Alias, IAlias } from "@aws-cdk/aws-kms";
 import { EmailSubscription } from "@aws-cdk/aws-sns-subscriptions";
+import { CLDemo } from "./cl-demo-stack";
+import {
+  applyCfnNagSuppressRules,
+  applyDependsOn,
+  cfn_suppress_rules,
+} from "./utils";
+import manifest from "./manifest.json";
+import path from "path";
+import { ResourceRetentionAspect } from "./resource-retention-aspect";
 
 enum LogLevel {
   ERROR = "error",
@@ -130,7 +133,7 @@ export class CLPrimary extends Stack {
      */
     const adminEmail: CfnParameter = new CfnParameter(this, "AdminEmail", {
       type: "String",
-      allowedPattern: "^[\\w]+\\@[\\w]+\\.[a-z]+$",
+      allowedPattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$",
     });
 
     /**
@@ -363,17 +366,6 @@ export class CLPrimary extends Stack {
         }),
       ],
     });
-    (helperPolicy1.node.defaultChild as CfnResource).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W12",
-            reason:
-              "* needed, actions do no support resource level permissions",
-          },
-        ],
-      },
-    };
 
     /**
      * @description helper lambda
@@ -386,26 +378,17 @@ export class CLPrimary extends Stack {
         LOG_LEVEL: LogLevel.INFO, //change as needed
         METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
         SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
+        CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
       },
       handler: "index.handler",
-      code: Code.fromAsset("../../source/services/helper/dist/cl-helper.zip"),
-      runtime: Runtime.NODEJS_12_X,
+      code: Code.fromAsset(
+        `${path.dirname(__dirname)}/../services/helper/dist/cl-helper.zip`
+      ),
+      runtime: Runtime.NODEJS_14_X,
       timeout: Duration.seconds(300),
       role: helperRole,
     });
-    const hF = helperFunc.node.findChild("Resource") as CfnFunction;
-    hF.addDependsOn(helperPolicy1.node.defaultChild as CfnResource);
-    hF.cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W58",
-            reason:
-              "CloudWatch logs write permissions added with managed role AWSLambdaBasicExecutionRole",
-          },
-        ],
-      },
-    };
+    applyDependsOn(helperFunc, helperPolicy1);
 
     /**
      * @description custom resource for helper functions
@@ -414,19 +397,6 @@ export class CLPrimary extends Stack {
     const helperProvider: Provider = new Provider(this, "HelperProvider", {
       onEventHandler: helperFunc,
     });
-    (helperProvider.node.children[0].node.findChild(
-      "Resource"
-    ) as CfnFunction).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W58",
-            reason:
-              "CloudWatch logs write permissions added with managed role AWSLambdaBasicExecutionRole",
-          },
-        ],
-      },
-    };
 
     /**
      * Get UUID for deployment
@@ -481,7 +451,7 @@ export class CLPrimary extends Stack {
       accountRecovery: AccountRecovery.EMAIL_ONLY,
       selfSignUpEnabled: false,
     });
-    // enforce advaned security mode
+    // enforce advanced security mode
     (esUserPool.node.defaultChild as CfnUserPool).addPropertyOverride(
       "UserPoolAddOns",
       {
@@ -590,16 +560,6 @@ export class CLPrimary extends Stack {
         },
       })
     );
-    (esCognitoRole.node.defaultChild as CfnResource).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W11",
-            reason: "cognito actions do not allow resource level permissions",
-          },
-        ],
-      },
-    };
 
     /**
      * @description IAM role for kinesis firehose
@@ -641,7 +601,7 @@ export class CLPrimary extends Stack {
       subnetConfiguration: [
         {
           cidrMask: 24,
-          subnetType: SubnetType.ISOLATED,
+          subnetType: SubnetType.PRIVATE_ISOLATED,
           name: "ESIsolatedSubnet",
         },
         {
@@ -651,19 +611,7 @@ export class CLPrimary extends Stack {
         },
       ],
     });
-    VPC.publicSubnets.map((subnet) => {
-      (subnet.node.defaultChild as CfnResource).cfnOptions.metadata = {
-        cfn_nag: {
-          rules_to_suppress: [
-            {
-              id: "W33",
-              reason:
-                "public ip needed for jumpbox, restricted by appropriate security group rule",
-            },
-          ],
-        },
-      };
-    });
+    Aspects.of(VPC).add(new ResourceRetentionAspect());
 
     /**
      * @description security group for es domain
@@ -683,6 +631,7 @@ export class CLPrimary extends Stack {
       Port.tcp(443),
       "allow outbound https"
     );
+    Aspects.of(esSg).add(new ResourceRetentionAspect());
 
     /**
      * @description es domain
@@ -692,10 +641,9 @@ export class CLPrimary extends Stack {
       version: ElasticsearchVersion.V7_7,
       domainName: esDomain.valueAsString,
       enforceHttps: true,
-      vpcOptions: {
-        subnets: VPC.isolatedSubnets,
-        securityGroups: [esSg],
-      },
+      vpc: VPC,
+      vpcSubnets: [{ subnets: VPC.isolatedSubnets }],
+      securityGroups: [esSg],
       encryptionAtRest: {
         enabled: true,
       },
@@ -710,17 +658,6 @@ export class CLPrimary extends Stack {
         userPoolId: esUserPool.userPoolId,
       },
     });
-    const _d = domain.node.defaultChild as CfnResource;
-    _d.cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W28",
-            reason: "using customer provided domain name",
-          },
-        ],
-      },
-    };
 
     // attach policy to idp auth role
     idpAuthRole.attachInlinePolicy(
@@ -758,8 +695,8 @@ export class CLPrimary extends Stack {
       DedicatedMasterCount: 3,
     };
     // adding cluster config
+    applyDependsOn(domain, upDomain);
     const cfnDomain = domain.node.defaultChild as CfnDomain;
-    cfnDomain.addDependsOn(upDomain.node.defaultChild as CfnResource);
     cfnDomain.addPropertyOverride("ElasticsearchClusterConfig", clusterConfig);
 
     /**
@@ -824,27 +761,19 @@ export class CLPrimary extends Stack {
         DELIVERY_STREAM: manifest.firehoseName,
         METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
         SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
+        CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
       },
       handler: "index.handler",
       code: Code.fromAsset(
-        "../../source/services/transformer/dist/cl-transformer.zip"
+        `${path.dirname(
+          __dirname
+        )}/../services/transformer/dist/cl-transformer.zip`
       ),
-      runtime: Runtime.NODEJS_12_X,
+      runtime: Runtime.NODEJS_14_X,
       timeout: Duration.seconds(300),
       deadLetterQueue: dlq,
       deadLetterQueueEnabled: true,
     });
-    (logTransformer.node.defaultChild as CfnResource).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W58",
-            reason:
-              "CloudWatch logs write permissions added with managed role AWSLambdaBasicExecutionRole",
-          },
-        ],
-      },
-    };
 
     /**
      * @description Kms key for SNS topic
@@ -904,22 +833,6 @@ export class CLPrimary extends Stack {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       accessControl: BucketAccessControl.LOG_DELIVERY_WRITE,
     });
-    // cfn_nag warning suppress rule
-    const ab = accessLogsBucket.node.defaultChild as CfnResource;
-    ab.cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W35",
-            reason: "access logging disabled, its a logging bucket",
-          },
-          {
-            id: "W51",
-            reason: "permission given for log delivery",
-          },
-        ],
-      },
-    };
 
     /**
      * @description S3 bucket for Firehose
@@ -940,10 +853,8 @@ export class CLPrimary extends Stack {
         resources: [firehoseBucket.bucketArn, `${firehoseBucket.bucketArn}/*`],
       })
     );
-    // apply deletion policy
-    const fb = firehoseBucket.node.defaultChild as CfnResource;
-    fb.applyRemovalPolicy(RemovalPolicy.RETAIN);
-
+    // apply retention policy
+    Aspects.of(firehoseBucket).add(new ResourceRetentionAspect());
     /**
      * @description log group for firehose error events
      * @type {LogGroup}
@@ -1081,21 +992,6 @@ export class CLPrimary extends Stack {
         }),
       ],
     });
-    (firehosePolicy.node.defaultChild as CfnResource).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W12",
-            reason:
-              "* needed for actions that do no support resource level permissions",
-          },
-          {
-            id: "W76",
-            reason: "policy verified",
-          },
-        ],
-      },
-    };
 
     /**
      * @description CL Firehose
@@ -1138,7 +1034,7 @@ export class CLPrimary extends Stack {
         },
       }
     );
-    clFirehose.addDependsOn(firehosePolicy.node.defaultChild as CfnResource);
+    applyDependsOn(clFirehose, firehosePolicy);
 
     // allow lambda to put records on firehose
     logTransformer.addToRolePolicy(
@@ -1202,9 +1098,7 @@ export class CLPrimary extends Stack {
         }),
       ],
     });
-    (helperPolicy2.node.defaultChild as CfnResource).addDependsOn(
-      cwDestPolicy.node.defaultChild as CfnResource
-    );
+    applyDependsOn(helperPolicy2, cwDestPolicy);
 
     /**
      * @description create CW Logs Destination
@@ -1218,16 +1112,16 @@ export class CLPrimary extends Stack {
         serviceToken: helperProvider.serviceToken,
         properties: {
           Regions: spokeRegions.valueAsList,
-          DestinationName: manifest.cwDestinationName,
+          DestinationName: `${
+            manifest.cwDestinationName
+          }-${createUniqueId.getAttString("UUID")}`, // adding uuid for unique deployments
           Role: cwDestinationRole.roleArn,
           DataStream: clDataStream.streamArn,
           SpokeAccounts: spokeAccts.valueAsList,
         },
       }
     );
-    (cwDestination.node.defaultChild as CfnResource).addDependsOn(
-      helperPolicy2.node.defaultChild as CfnResource
-    );
+    applyDependsOn(cwDestination, helperPolicy2);
 
     /**
      * @description Jumpbox resources
@@ -1246,15 +1140,74 @@ export class CLPrimary extends Stack {
      */
     const demo: NestedStack = new CLDemo(this, "CL-DemoStack", {
       parameters: {
-        ["CWDestinationParm"]: `arn:${this.partn}:logs:${this.region}:${this.account}:destination:${manifest.cwDestinationName}`,
+        ["CWDestinationParm"]: `arn:${this.partn}:logs:${this.region}:${
+          this.account
+        }:destination:${
+          manifest.cwDestinationName
+        }-${createUniqueId.getAttString("UUID")}`,
       },
     });
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     demo.nestedStackResource!.cfnOptions.condition = demoDeploymentCheck;
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    demo.nestedStackResource!.addDependsOn(
-      domain.node.defaultChild as CfnResource
+    applyDependsOn(demo.nestedStackResource as CfnResource, domain);
+
+    //=============================================================================================
+    // cfn_nag suppress rules
+    //=============================================================================================
+    applyCfnNagSuppressRules(helperPolicy1.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W12,
+    ]);
+
+    applyCfnNagSuppressRules(helperFunc.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W58,
+      cfn_suppress_rules.W89,
+      cfn_suppress_rules.W92,
+    ]);
+
+    applyCfnNagSuppressRules(
+      helperProvider.node.children[0].node.findChild("Resource") as CfnResource,
+      [cfn_suppress_rules.W58, cfn_suppress_rules.W89, cfn_suppress_rules.W92]
     );
+
+    applyCfnNagSuppressRules(esCognitoRole.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W11,
+    ]);
+
+    VPC.publicSubnets.forEach((subnet) => {
+      applyCfnNagSuppressRules(subnet.node.defaultChild as CfnResource, [
+        cfn_suppress_rules.W33,
+      ]);
+    });
+
+    applyCfnNagSuppressRules(domain.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W28,
+    ]);
+
+    applyCfnNagSuppressRules(logTransformer.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W58,
+      cfn_suppress_rules.W89,
+      cfn_suppress_rules.W92,
+    ]);
+
+    applyCfnNagSuppressRules(
+      accessLogsBucket.node.defaultChild as CfnResource,
+      [cfn_suppress_rules.W35, cfn_suppress_rules.W51]
+    );
+
+    applyCfnNagSuppressRules(
+      firehoseLG.node.findChild("Resource") as CfnResource,
+      [cfn_suppress_rules.W84]
+    );
+
+    applyCfnNagSuppressRules(firehosePolicy.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W12,
+      cfn_suppress_rules.W76,
+    ]);
+
+    applyCfnNagSuppressRules(flowLg.node.findChild("Resource") as CfnResource, [
+      cfn_suppress_rules.W84,
+    ]);
 
     //=============================================================================================
     // Output
@@ -1262,7 +1215,11 @@ export class CLPrimary extends Stack {
     new CfnOutput(this, "Destination Subscription Command", {
       description: "Command to run in spoke accounts/regions",
       value: `aws logs put-subscription-filter \
-      --destination-arn arn:${this.partn}:logs:<region>:${this.account}:destination:${manifest.cwDestinationName} \
+      --destination-arn arn:${this.partn}:logs:<region>:${
+        this.account
+      }:destination:${manifest.cwDestinationName}-${createUniqueId.getAttString(
+        "UUID"
+      )} \
       --log-group-name <MyLogGroup> \
       --filter-name <MyFilterName> \
       --filter-pattern <MyFilterPattern> \

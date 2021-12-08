@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
  *  with the License. A copy of the License is located at
@@ -11,7 +11,7 @@
  *  and limitations under the License.
  */
 import got from "got";
-import { logger } from "../logger/index";
+
 /**
  * Send metrics to solutions endpoint
  * @class Metrics
@@ -21,15 +21,15 @@ export class Metrics {
    * Sends anonymous metric
    * @param {object} metric - metric JSON data
    */
-  static async sendAnonymousMetric(endpoint: string, metric: any) {
-    logger.debug({
-      label: "metrics/sendAnonymousMetric",
-      message: `metrics endpoint: ${endpoint}`,
-    });
-    logger.debug({
-      label: "metrics/sendAnonymousMetric",
-      message: `sending metric:${JSON.stringify(metric)}`,
-    });
+  static async sendAnonymousMetric(
+    endpoint: string,
+    metric: {
+      Solution: string;
+      UUID: string;
+      TimeStamp: string;
+      Data: { [key: string]: string };
+    }
+  ): Promise<string> {
     try {
       await got(endpoint, {
         port: 443,
@@ -40,19 +40,9 @@ export class Metrics {
         },
         body: JSON.stringify(metric),
       });
-      logger.info({
-        label: "metrics/sendAnonymousMetric",
-        message: `metric sent successfully`,
-      });
       return `Metric sent: ${JSON.stringify(metric)}`;
     } catch (error) {
-      logger.warn({
-        label: "metrics/sendAnonymousMetric",
-        message: `Error occurred while sending metric: ${JSON.stringify(
-          error
-        )}`,
-      });
-      return `Error occurred while sending metric`;
+      return `error occurred while sending metric: ${(error as Error).message}`;
     }
   }
 }

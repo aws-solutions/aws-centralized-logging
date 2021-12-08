@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
  *  with the License. A copy of the License is located at
@@ -23,41 +23,15 @@
     }
  */
 import { createLogger, transports, format } from "winston";
-import { WinstonSNS } from "./winston-sns";
 const { combine, timestamp, printf } = format;
 
 /*
- * Foramting the output as desired
+ * Formatting the output as desired
  */
 const myFormat = printf(({ level, label, message }) => {
   const _level = level.toUpperCase();
   if (label) return `[${_level}] [${label}] ${message}`;
   else return `[${_level}] ${message}`;
-});
-
-/*
- * String mask
- */
-const maskCardNumbers = (num: any) => {
-  const str = num.toString();
-  const { length } = str;
-
-  return Array.from(str, (n, i) => {
-    return i < length - 4 ? "*" : n;
-  }).join("");
-};
-
-// Define the format that mutates the info object.
-const maskFormat = format((info: any) => {
-  // You can CHANGE existing property values
-  if (info.message.securedNumber) {
-    info.message.securedNumber = maskCardNumbers(info.message.securedNumber);
-  }
-
-  // You can also ADD NEW properties if you wish
-  //info.hasCreditCard = !!info.creditCard;
-
-  return info;
 });
 
 export const logger = createLogger({
@@ -66,7 +40,6 @@ export const logger = createLogger({
     // Order is important here, the formats are called in the
     // order they are passed to combine.
     //
-    maskFormat(),
     timestamp(),
     myFormat
   ),
@@ -78,15 +51,5 @@ export const logger = createLogger({
       handleExceptions: true, //handle uncaught exceptions
       //format: format.splat()
     }),
-
-    //sns transport channel
-    ...(process.env.SNS_ERROR_NOTIFICATION == "true"
-      ? [
-          new WinstonSNS({
-            topic_arn: process.env.SNS_TOPIC_ARN,
-            level: "error",
-          }),
-        ]
-      : []),
   ],
 });

@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2021-12-05
+
+### Added
+
+- support for '+' in admin email address
+
+### Changed
+
+- aws-cdk updated to 1.132.0
+- moved generic helpers to utils library, [logger](./source/services/utils/logger), [metrics](./source/services/utils/metrics)
+- CloudWatch Logs destinations created with UUID appended to name for uniqueness
+
 ## [4.0.0] - 2020-12-15
 
 ### Added
