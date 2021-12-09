@@ -16,12 +16,15 @@ npm-debug.log
 .scannerwork
 *.xml
 reports
+source/services/@aws-solutions/utils/*/index.js
 
 # Node dependencies
 node_modules
-package-lock.json
 
 # CDK asset staging directory
 .cdk.staging
 cdk.out
 __snapshots__
+
+# Misc
+.DS_Store

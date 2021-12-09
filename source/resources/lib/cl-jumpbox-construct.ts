@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
  *  with the License. A copy of the License is located at
@@ -30,6 +30,7 @@ import {
   Peer,
 } from "@aws-cdk/aws-ec2";
 import manifest from "./manifest.json";
+import { applyCfnNagSuppressRules, cfn_suppress_rules } from "./utils";
 
 interface IJumpbox {
   /**
@@ -80,16 +81,9 @@ export class Jumpbox extends Construct {
     });
     sg.addEgressRule(Peer.anyIpv4(), Port.tcp(80), "allow outbound https");
     sg.addEgressRule(Peer.anyIpv4(), Port.tcp(443), "allow outbound https");
-    (sg.node.defaultChild as CfnResource).cfnOptions.metadata = {
-      cfn_nag: {
-        rules_to_suppress: [
-          {
-            id: "W5",
-            reason: "outbound traffic for http[s]",
-          },
-        ],
-      },
-    };
+    applyCfnNagSuppressRules(sg.node.defaultChild as CfnResource, [
+      cfn_suppress_rules.W5,
+    ]);
     (sg.node.defaultChild as CfnResource).cfnOptions.condition = props.deploy;
 
     /**

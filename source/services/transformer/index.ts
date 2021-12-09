@@ -1,5 +1,5 @@
 /**
- *  Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
  *  with the License. A copy of the License is located at
@@ -14,14 +14,14 @@
 import zlib from "zlib";
 import { Firehose } from "aws-sdk";
 import { Record } from "aws-sdk/clients/firehose";
-import { logger } from "./lib/common/logger";
-import { Metrics } from "./lib/common/metrics";
-import moment from "moment";
+import { logger } from "logger";
+import { Metrics } from "metrics";
+
 /**
  * @description interface for log event
  * @property {string} id for the log event
  * @property {number}  timestamp for the log event
- * @property {string}  message stringified log evenrt
+ * @property {string}  message stringified log event
  * @property {any}  extractedFields inferred fields from the event
  */
 interface ILogEvent {
@@ -75,6 +75,7 @@ function transform(
   if ("responseElements" in source)
     source["responseElements"] = JSON.stringify(source["responseElements"]);
   if ("apiVersion" in source) source["apiVersion"] = "" + source["apiVersion"];
+  if ("account_id" in source) source["account_id"] = "" + source["account_id"];
   source["timestamp"] = new Date(1 * logEvent.timestamp).toISOString();
   source["id"] = logEvent.id;
   source["type"] = "CloudWatchLogs";
@@ -93,23 +94,23 @@ function transform(
  */
 function buildSource(message: string, extractedFields: any) {
   if (extractedFields) {
-    const source = {};
+    logger.debug({
+      label: "handler",
+      message: `extractedFields: ${extractedFields} `,
+    });
+    const source: { [key: string]: any } = {};
 
     for (const key in extractedFields) {
-      if (
-        Object.prototype.hasOwnProperty.call(extractedFields, key) &&
-        extractedFields[key]
-      ) {
+      if (extractedFields[key]) {
         const value = extractedFields[key];
-
         if (isNumeric(value)) {
           source[key] = 1 * value;
           continue;
         }
 
-        const jsonSubString = extractJson(value);
-        if (jsonSubString !== null) {
-          source["$" + key] = JSON.parse(jsonSubString);
+        const _jsonSubString = extractJson(value);
+        if (_jsonSubString !== null) {
+          source["$" + key] = JSON.parse(_jsonSubString);
         }
 
         source[key] = value;
@@ -119,6 +120,10 @@ function buildSource(message: string, extractedFields: any) {
     return source;
   }
 
+  logger.debug({
+    label: "handler",
+    message: `message: ${message} `,
+  });
   const jsonSubString = extractJson(message);
   if (jsonSubString !== null) {
     return JSON.parse(jsonSubString);
@@ -199,7 +204,9 @@ async function putRecords(records: Record[]) {
     DeliveryStreamName: "" + process.env.DELIVERY_STREAM /* required */,
     Records: records,
   };
-  const firehose = new Firehose();
+  const firehose = new Firehose({
+    customUserAgent: process.env.CUSTOM_SDK_USER_AGENT,
+  });
   await firehose.putRecordBatch(params).promise();
 
   // send usage metric to aws-solutions
@@ -219,13 +226,13 @@ async function putRecords(records: Record[]) {
     });
 
     const metric = {
-      Solution: process.env.SOLUTION_ID,
-      UUID: process.env.UUID,
-      TimeStamp: moment.utc().format("YYYY-MM-DD HH:mm:ss.S"),
+      Solution: <string>process.env.SOLUTION_ID,
+      UUID: <string>process.env.UUID,
+      TimeStamp: new Date().toISOString().replace("T", " ").replace("Z", ""), // Date and time instant in a java.sql.Timestamp compatible format,
       Data: {
-        TotalItemSize: totalItemSize,
-        Version: process.env.SOLUTION_VERSION,
-        Region: process.env.AWS_REGION,
+        TotalItemSize: "" + totalItemSize,
+        Version: <string>process.env.SOLUTION_VERSION,
+        Region: <string>process.env.AWS_REGION,
       },
     };
     await Metrics.sendAnonymousMetric(
@@ -254,7 +261,7 @@ exports.handler = async (event: IEvent) => {
           });
           throw new Error("error in decompressing data");
         }
-        const payload = JSON.parse(decompressed);
+        const payload = JSON.parse(decompressed.toString());
         logger.debug({ label: "handler", message: JSON.stringify(payload) });
 
         // CONTROL_MESSAGE are sent by CWL to check if the subscription is reachable.
