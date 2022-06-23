@@ -8,7 +8,7 @@
     "postinstall": "npm run build:ts"
   },
   "dependencies": {
-    "got": "^11.8.1"
+    "got": "^11.8.5"
   },
   "devDependencies": {
     "ts-node": "^10.0.0",
