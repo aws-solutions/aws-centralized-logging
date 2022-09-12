@@ -12,7 +12,7 @@
  */
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "logger";
-import { Metrics } from "metrics";
+import { Metrics } from "metric";
 import { CloudWatchLogs, EC2, IAM } from "aws-sdk";
 
 interface IEvent {

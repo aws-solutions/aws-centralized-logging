@@ -1,4 +1,4 @@
-# AWS Centralized Logging CDK Project
+# Centralized Logging on AWS CDK Project
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 

@@ -15,7 +15,7 @@ import zlib from "zlib";
 import { Firehose } from "aws-sdk";
 import { Record } from "aws-sdk/clients/firehose";
 import { logger } from "logger";
-import { Metrics } from "metrics";
+import { Metrics } from "metric";
 
 /**
  * @description interface for log event

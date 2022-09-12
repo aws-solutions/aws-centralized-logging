@@ -1,0 +1,18 @@
+{
+  "name": "util",
+  "version": "1.0.0",
+  "description": "utility for aws-solutions",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build:ts": "npx tsc --project ./tsconfig.json"
+  },
+  "dependencies": {
+    "got": "11.8.5",
+    "winston": "^3.8.1"
+  },
+  "devDependencies": {
+    "ts-node": "^10.8.2",
+    "typescript": "^4.7.4",
+    "@types/node": "^18.6.1"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "name": "aws-centralized-logging",
-  "version": "4.0.1",
-  "description": "AWS Centralized Logging",
+  "version": "4.0.2",
+  "description": "Centralized Logging on AWS",
   "scripts": {
     "lint": "./node_modules/eslint/bin/eslint.js . --ext .ts",
     "prettier-format": "./node_modules/prettier/bin-prettier.js --config .prettierrc.yml '**/*.ts' --write",
@@ -13,13 +13,15 @@
   "author": "aws-solutions",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@types/node": "^18.6.1",
     "@types/uuid": "^8.3.1",
-    "@typescript-eslint/eslint-plugin": "^5.0.0",
-    "@typescript-eslint/parser": "^5.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.30.7",
+    "@typescript-eslint/parser": "^5.30.7",
     "eslint": "^8.0.0",
     "eslint-config-prettier": "^8.3.0",
-    "eslint-plugin-prettier": "^4.0.0",
+    "eslint-plugin-prettier": "^4.2.1",
     "prettier": "^2.4.1",
-    "typescript": "^4.4.2"
+    "typescript": "^4.4.2",
+    "aws-cdk": "^1.163.1"
   }
 }

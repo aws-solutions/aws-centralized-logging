@@ -13,7 +13,7 @@
 
 /**
  * @description
- * This is Jumpbox construct for AWS Centralized Logging Solution
+ * This is Jumpbox construct for Centralized Logging on AWS Solution
  * @author @aws-solutions
  */
 

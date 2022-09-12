@@ -1,34 +1,26 @@
 {
   "name": "cl-transformer",
-  "version": "4.0.1",
-  "description": "transformer lambda for Centralized Logging solution",
+  "version": "4.0.2",
+  "description": "transformer lambda for Centralized Logging on AWS solution",
   "main": "index.js",
   "scripts": {
-    "preinstall:logger": "cd ../@aws-solutions/utils/logger && npm ci",
-    "preinstall:metrics": "cd ../@aws-solutions/utils/metrics && npm ci",
-    "preinstall": "npm run preinstall:logger && npm run preinstall:metrics",
     "test": "echo \"nothing to do\"",
-    "watch": "tsc -w",
+    "watch": "npx tsc -w",
+    "preinstall": "cd ../@aws-solutions/utils && npm ci --production",
     "build:clean": "rm -rf ./node_modules && rm -rf ./dist",
-    "build:install": "npm run preinstall && npm ci",
-    "build:ts": "./node_modules/typescript/bin/tsc --project ./tsconfig.json",
-    "build:copy": "cp -RL ./node_modules ./dist/node_modules && rm -rf ./dist/__tests__",
-    "build:zip": "cd ./dist && zip -r cl-transformer.zip .",
-    "prune:logger": "cd ./node_modules/logger && npm prune --production",
-    "prune:metrics": "cd ./node_modules/metrics && npm prune --production",
-    "build:prune": "npm run prune:logger && npm run prune:metrics",
-    "build:all": "npm run build:clean && npm run build:install && npm run build:ts && npm run build:prune && npm prune --production && npm run build:copy && npm run build:zip"
+    "build:ts": "npx tsc --project ./tsconfig.json",
+    "build:copy": "cp -r ./node_modules ./dist/transformer && cp -r ../@aws-solutions/utils/node_modules/* ./dist/transformer/node_modules/ && cp -r ./dist/@aws-solutions/utils/*.js ./dist/transformer/",
+    "build:zip": "cd ./dist/transformer && zip -r cl-transformer.zip .",
+    "build:all": "npm run build:clean && npm ci && npm run build:ts && npm prune --production && npm run build:copy && npm run build:zip"
   },
   "author": "aws-solutions",
   "license": "Apache-2.0",
   "dependencies": {
-    "aws-sdk": "^2.714.0",
-    "logger": "file:../@aws-solutions/utils/logger",
-    "metrics": "file:../@aws-solutions/utils/metrics"
+    "aws-sdk": "^2.1181.0"
   },
   "devDependencies": {
-    "typescript": "^4.0.2",
-    "@types/uuid": "^8.0.0",
-    "@types/node": "^14.0.23"
+    "typescript": "^4.7.4",
+    "@types/uuid": "^8.3.4",
+    "@types/node": "^18.6.1"
   }
 }

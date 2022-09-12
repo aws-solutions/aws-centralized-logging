@@ -1,4 +1,4 @@
-# AWS Centralized Logging Solution
+# Centralized Logging on AWS Solution
 
 _Note:_ For any relevant information outside the scope of this readme, please refer to the solution landing page and implementation guide.
 
@@ -21,7 +21,7 @@ _Note:_ For any relevant information outside the scope of this readme, please re
 
 ## Solution Overview
 
-Centralized Logging is a reference implementation that provides a foundation for logging to a centralized account. Customers can leverage the solution to index CloudTrail Logs, CW Logs, VPC Flow Logs on an Amazon OpenSearch Service domain. The logs can then be searched on different fields.
+Centralized Logging on AWS is a reference implementation that provides a foundation for logging to a centralized account. Customers can leverage the solution to index CloudTrail Logs, CW Logs, VPC Flow Logs on an Amazon OpenSearch Service domain. The logs can then be searched on different fields.
 
 This solution gives you a turnkey environment to begin logging and analyzing your AWS environment and applications. Additionally, if you are looking to
 
@@ -35,7 +35,7 @@ This solution uses Amazon OpenSearch Service (successor to Amazon Elasticsearch 
 
 ## Architecture
 
-The Centralized Logging solution contains the following components: **log ingestion**, **log indexing**, and **visualization**. You must deploy the AWS CloudFormation template in the AWS account where you intend to store your log data.
+The Centralized Logging on AWS solution contains the following components: **log ingestion**, **log indexing**, and **visualization**. You must deploy the AWS CloudFormation template in the AWS account where you intend to store your log data.
 
 <img src="./architecture.png" width="750" height="500">
 
@@ -61,7 +61,7 @@ npm run lint
 
 ### Changes
 
-You may make any needed change as per your requirement. If you want to customize the Centralized Logging opinionated defaults, you can modify the [solution manifest file](./source/resources/lib/manifest.json). You can also control sending solution usage metrics to aws-solutions, from the manifest file.
+You may make any needed change as per your requirement. If you want to customize the Centralized Logging on AWS opinionated defaults, you can modify the [solution manifest file](./source/resources/lib/manifest.json). You can also control sending solution usage metrics to aws-solutions, from the manifest file.
 
 ```
 "solutionVersion": "%%VERSION%%", #provide a valid value eg. v1.0
@@ -88,7 +88,7 @@ You can build lambda binaries with the following command from the root of the pr
 
 ### Deploy
 
-Run the following command from the root of the project. Deploys all the primary solution components needed for centralized logging. **Deploy in Primary Account**
+Run the following command from the root of the project. Deploys all the primary solution components needed for Centralized Logging on AWS. **Deploy in Primary Account**
 
 ```
 cd source/resources
@@ -119,7 +119,7 @@ You would need to update the **ESDomain** resource in cl-primary-stack.ts as bel
 
 ## File structure
 
-AWS Centralized Logging solution consists of:
+Centralized Logging on AWS solution consists of:
 
 - cdk constructs to generate needed resources
 - helper for bootstrapping purposes like creating CloudWatch Logs Destinations
