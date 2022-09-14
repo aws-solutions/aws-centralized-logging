@@ -2,6 +2,11 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "noEmit": false
+    "noEmit": false,
+    "baseUrl": ".",
+    "paths": {
+      "logger": ["../@aws-solutions/utils/logger"],
+      "metric": ["../@aws-solutions/utils/metric"]
+    }
   }
 }

@@ -13,7 +13,7 @@
 
 /**
  * @description
- * This is Demo Stack for AWS Centralized Logging Solution
+ * Demo Stack for Centralized Logging on AWS
  * @author @aws-solutions
  */
 

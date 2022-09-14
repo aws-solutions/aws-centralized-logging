@@ -15,7 +15,7 @@
 
 /**
  * @description
- * This is Primary Stack for AWS Centralized Logging
+ * This is the Primary Stack for Centralized Logging on AWS
  * @author @aws-solutions
  */
 
@@ -188,7 +188,7 @@ export class CLPrimary extends Stack {
       this,
       "JumpboxDeploy",
       {
-        description: "Do you want to deploy jumbox?",
+        description: "Do you want to deploy jumpbox?",
         type: "String",
         default: "No",
         allowedValues: ["No", "Yes"],
@@ -382,7 +382,9 @@ export class CLPrimary extends Stack {
       },
       handler: "index.handler",
       code: Code.fromAsset(
-        `${path.dirname(__dirname)}/../services/helper/dist/cl-helper.zip`
+        `${path.dirname(
+          __dirname
+        )}/../services/helper/dist/helper/cl-helper.zip`
       ),
       runtime: Runtime.NODEJS_14_X,
       timeout: Duration.seconds(300),
@@ -767,7 +769,7 @@ export class CLPrimary extends Stack {
       code: Code.fromAsset(
         `${path.dirname(
           __dirname
-        )}/../services/transformer/dist/cl-transformer.zip`
+        )}/../services/transformer/dist/transformer/cl-transformer.zip`
       ),
       runtime: Runtime.NODEJS_14_X,
       timeout: Duration.seconds(300),

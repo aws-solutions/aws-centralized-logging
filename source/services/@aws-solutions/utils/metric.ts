@@ -32,7 +32,6 @@ export class Metrics {
   ): Promise<string> {
     try {
       await got(endpoint, {
-        port: 443,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
