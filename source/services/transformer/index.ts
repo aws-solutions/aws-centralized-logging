@@ -275,11 +275,15 @@ exports.handler = async (event: IEvent) => {
             payload.logGroup,
             payload.logStream
           );
-          await putRecords(records);
-          logger.info({
-            label: "handler",
-            message: "records put success",
-          });
+          const chunkSize = 500;
+          for (let i = 0; i < records.length; i += chunkSize) {
+            const chunk = records.slice(i, i + chunkSize);
+            await putRecords(chunk);
+            logger.info({
+              label: "handler",
+              message: `#${i}: ${chunk.length} records put success`,
+            });
+          }
         } else {
           return;
         }
