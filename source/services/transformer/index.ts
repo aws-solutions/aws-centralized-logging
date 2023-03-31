@@ -242,6 +242,21 @@ async function putRecords(records: Record[]) {
   }
 }
 
+/**
+ * @description Split record array to limit number of records for firehose.putRecordBatch
+ * @param arr - The record list to split
+ * @param n - Maximum size of e
+ */
+async function chunksArray(arr:Record[], n:number): Promise<Record[][]> {
+  let resultArray = [];
+  for (let i = 0; i < arr.length; i += n) {
+      const chunk = arr.slice(i, i + n);
+      resultArray.push(chunk);
+  }
+
+  return resultArray;
+}
+
 exports.handler = async (event: IEvent) => {
   logger.debug({
     label: "handler",
@@ -275,11 +290,14 @@ exports.handler = async (event: IEvent) => {
             payload.logGroup,
             payload.logStream
           );
-          await putRecords(records);
-          logger.info({
-            label: "handler",
-            message: "records put success",
-          });
+          const recordsLists = await chunksArray(records, 499)
+          await Promise.all(recordsLists.map(async (recordsList) => {
+            await putRecords(recordsList);
+            logger.info({
+              label: "handler",
+              message: "records put success",
+            });
+          }));
         } else {
           return;
         }
