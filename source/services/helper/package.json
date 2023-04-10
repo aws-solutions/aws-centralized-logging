@@ -17,7 +17,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "uuid": "^8.2.0",
-    "aws-sdk": "2.1181.0"
+    "aws-sdk": "2.1354.0"
   },
   "devDependencies": {
     "typescript": "^4.7.4",
