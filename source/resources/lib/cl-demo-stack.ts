@@ -1,15 +1,5 @@
-/**
- *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
- *  with the License. A copy of the License is located at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  or in the 'license' file accompanying this file. This file is distributed on an 'AS IS' BASIS, WITHOUT WARRANTIES
- *  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions
- *  and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * @description
@@ -22,36 +12,27 @@ import {
   CfnOutput,
   CfnParameter,
   CfnResource,
-  Construct,
   Fn,
   NestedStack,
   NestedStackProps,
   RemovalPolicy,
-  Stack,
-} from "@aws-cdk/core";
+  Stack
+} from "aws-cdk-lib";
+import { Construct } from "constructs";
 import {
-  Vpc,
-  SubnetType,
   FlowLog,
+  FlowLogDestination,
   FlowLogResourceType,
   FlowLogTrafficType,
-  FlowLogDestination,
-} from "@aws-cdk/aws-ec2";
-import {
-  Effect,
-  PolicyStatement,
-  Role,
-  ServicePrincipal,
-} from "@aws-cdk/aws-iam";
-import {
-  CfnSubscriptionFilter,
-  LogGroup,
-  RetentionDays,
-} from "@aws-cdk/aws-logs";
-import { Trail } from "@aws-cdk/aws-cloudtrail";
-import { BlockPublicAccess, Bucket, BucketEncryption } from "@aws-cdk/aws-s3";
+  SubnetType,
+  Vpc
+} from "aws-cdk-lib/aws-ec2";
+import { Effect, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { CfnSubscriptionFilter, LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Trail } from "aws-cdk-lib/aws-cloudtrail";
+import { BlockPublicAccess, Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
 import { EC2Demo } from "./cl-demo-ec2-construct";
-import { cfn_suppress_rules, applyCfnNagSuppressRules } from "./utils";
+import { applyCfnNagSuppressRules, cfn_suppress_rules } from "./utils";
 import manifest from "./manifest.json";
 
 /**
@@ -165,6 +146,7 @@ export class CLDemo extends NestedStack {
         },
       ],
     });
+    demoVPC.applyRemovalPolicy(RemovalPolicy.DESTROY);
     demoVPC.publicSubnets.forEach((subnet) => {
       applyCfnNagSuppressRules(subnet.node.defaultChild as CfnResource, [
         cfn_suppress_rules.W33,
@@ -201,10 +183,6 @@ export class CLDemo extends NestedStack {
       destination: FlowLogDestination.toCloudWatchLogs(flowLg, flowRole),
     });
 
-    /**
-     * @description subscription filter for flow logs
-     * @type {SubscriptionFilter}
-     */
     new CfnSubscriptionFilter(this, "FlowLogSubscription", {
       destinationArn: cwLogsDestinationArn.valueAsString,
       filterPattern: Fn.findInMap("FilterPatternLookup", "FlowLogs", "Pattern"),
@@ -241,6 +219,7 @@ export class CLDemo extends NestedStack {
      */
     const trailBucket: Bucket = new Bucket(this, "TrailBucket", {
       encryption: BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
     });
     trailBucket.addToResourcePolicy(
@@ -274,10 +253,6 @@ export class CLDemo extends NestedStack {
       includeGlobalServiceEvents: true,
     });
 
-    /**
-     * @description subscription filter for cloudtrail logs
-     * @type {SubscriptionFilter}
-     */
     new CfnSubscriptionFilter(this, "CloudTrailSubscription", {
       destinationArn: cwLogsDestinationArn.valueAsString,
       filterPattern: Fn.findInMap(

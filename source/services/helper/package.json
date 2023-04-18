@@ -17,11 +17,12 @@
   "license": "Apache-2.0",
   "dependencies": {
     "uuid": "^8.2.0",
-    "aws-sdk": "2.1181.0"
+    "aws-sdk": "^2.1354.0"
   },
   "devDependencies": {
     "typescript": "^4.7.4",
     "@types/uuid": "^8.3.4",
-    "@types/node": "^18.6.1"
+    "@types/node": "^18.6.1",
+    "@types/aws-lambda": "^8.10.114"
   }
 }

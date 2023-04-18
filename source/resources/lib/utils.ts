@@ -1,17 +1,5 @@
-/**
- *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"). You may
- *  not use this file except in compliance with the License. A copy of the
- *  License is located at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  or in the 'license' file accompanying this file. This file is distributed
- *  on an 'AS IS' BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express
- *  or implied. See the License for the specific language governing permissions
- *  and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * @description
@@ -19,17 +7,13 @@
  * @author @aws-solutions
  */
 
-import { Resource, CfnResource, RemovalPolicy } from "@aws-cdk/core";
+import { Resource, CfnResource, RemovalPolicy } from "aws-cdk-lib";
 
 interface CfnNagSuppression {
   id: string;
   reason: string;
 }
 
-/**
- * @description function to apply retention policy
- * @param resource
- */
 export function applyRetentionPolicy(resource: Resource | CfnResource) {
   if (resource) {
     if (resource instanceof Resource)
@@ -38,11 +22,6 @@ export function applyRetentionPolicy(resource: Resource | CfnResource) {
   }
 }
 
-/**
- * @description function to apply depends upon
- * @param dependee
- * @param parent
- */
 export function applyDependsOn(
   dependee: Resource | CfnResource,
   parent: Resource
@@ -50,15 +29,10 @@ export function applyDependsOn(
   if (dependee) {
     if (dependee instanceof Resource)
       dependee = dependee.node.defaultChild as CfnResource;
-    dependee.addDependsOn(parent.node.defaultChild as CfnResource);
+    dependee.addDependency(parent.node.defaultChild as CfnResource);
   }
 }
 
-/**
- * @description function to apply cfn_nag suppress rules
- * @param resource
- * @param suppressions
- */
 export function applyCfnNagSuppressRules(
   resource: CfnResource,
   suppressions: CfnNagSuppression[]
