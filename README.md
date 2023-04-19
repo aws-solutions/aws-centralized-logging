@@ -47,7 +47,7 @@ The Centralized Logging on AWS solution contains the following components: **log
 
 ## Customization
 
-- Prerequisite: Node.js>=14 | npm >= 7
+- Prerequisite: Node.js>=16 | npm >= 8
 
 ### Setup
 

@@ -1,15 +1,5 @@
-/**
- *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
- *  with the License. A copy of the License is located at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  or in the 'license' file accompanying this file. This file is distributed on an 'AS IS' BASIS, WITHOUT WARRANTIES
- *  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions
- *  and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * @description
@@ -17,7 +7,8 @@
  * @author @aws-solutions
  */
 
-import { Stack, Construct, RemovalPolicy, CfnResource } from "@aws-cdk/core";
+import { Stack, RemovalPolicy, CfnResource } from "aws-cdk-lib";
+import { Construct } from "constructs";
 import {
   Vpc,
   Instance,
@@ -34,13 +25,13 @@ import {
   Peer,
   Port,
   InitPackage,
-} from "@aws-cdk/aws-ec2";
+} from "aws-cdk-lib/aws-ec2";
 import {
   LogGroup,
   RetentionDays,
   CfnSubscriptionFilter,
-} from "@aws-cdk/aws-logs";
-import { Effect, PolicyStatement } from "@aws-cdk/aws-iam";
+} from "aws-cdk-lib/aws-logs";
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
 import manifest from "./manifest.json";
 import { cfn_suppress_rules, applyCfnNagSuppressRules } from "./utils";
 
@@ -182,10 +173,6 @@ export class EC2Demo extends Construct {
     );
     this.publicIp = demoEC2.instancePublicIp;
 
-    /**
-     * @description subscription filter on web server log group
-     * @type {SubscriptionFilter}
-     */
     new CfnSubscriptionFilter(this, "WebServerSubscription", {
       destinationArn: props.destination,
       filterPattern:
@@ -193,7 +180,6 @@ export class EC2Demo extends Construct {
       logGroupName: ec2Lg.logGroupName,
     });
 
-    // cfn_nag suppress rule
     applyCfnNagSuppressRules(ec2Lg.node.findChild("Resource") as CfnResource, [
       cfn_suppress_rules.W84,
     ]);
