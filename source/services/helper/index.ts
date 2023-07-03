@@ -1,30 +1,14 @@
-/**
- *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
- *  with the License. A copy of the License is located at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  or in the 'license' file accompanying this file. This file is distributed on an 'AS IS' BASIS, WITHOUT WARRANTIES
- *  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions
- *  and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 import { v4 as uuidv4 } from "uuid";
 import { logger } from "logger";
-import { Metrics } from "metric";
 import { CloudWatchLogs, EC2, IAM } from "aws-sdk";
-
-interface IEvent {
-  RequestType: string;
-  ResponseURL: string;
-  StackId: string;
-  RequestId: string;
-  ResourceType: string;
-  LogicalResourceId: string;
-  ResourceProperties: any;
-  PhysicalResourceId?: string;
-}
+import {
+  Context,
+  CloudFormationCustomResourceEvent,
+  CloudFormationCustomResourceUpdateEvent,
+} from "aws-lambda";
+import { sendDeploymentMetrics } from "metric";
 
 const awsClients = {
   ec2: "2016-11-15",
@@ -36,12 +20,11 @@ interface IResponse {
   responseData: { [key: string]: unknown };
   status: string;
 }
-/**
- * @description entry point for helper function
- * @param {IEvent} event invoking event
- * @param {any} context from the invoking event
- */
-exports.handler = async (event: IEvent, context: any) => {
+
+export const handler = async (
+  event: CloudFormationCustomResourceEvent,
+  context: Context
+) => {
   logger.debug({
     label: "helper",
     message: `received event: ${JSON.stringify(event)}`,
@@ -57,8 +40,7 @@ exports.handler = async (event: IEvent, context: any) => {
     event.RequestType === "Create"
   ) {
     const { responseData, status } = createUUID();
-    // send response to custom resource
-    return sendResponse(event, context.logStreamName, status, responseData);
+    return responseBody(event, context.logStreamName, status, responseData);
   }
 
   /**
@@ -69,8 +51,7 @@ exports.handler = async (event: IEvent, context: any) => {
     event.RequestType === "Create"
   ) {
     const { responseData, status } = await createESRole();
-    // send response to custom resource
-    return sendResponse(event, context.logStreamName, status, responseData);
+    return responseBody(event, context.logStreamName, status, responseData);
   }
 
   /**
@@ -80,32 +61,29 @@ exports.handler = async (event: IEvent, context: any) => {
     event.ResourceType === "Custom::LaunchData" &&
     process.env.SEND_METRIC === "Yes"
   ) {
-    const { responseData, status } = await sendData(
+    const responseData = await sendDeploymentMetrics(
       properties,
       event.RequestType
     );
-    // send response to custom resource
-    return sendResponse(event, context.logStreamName, status, responseData);
+    return responseBody(event, context.logStreamName, "SUCCESS", responseData);
   }
 
   /**
    * handle CW destinations
    */
-
   if (event.ResourceType === "Custom::CWDestination") {
     const { responseData, status } = await crudDestinations(
       properties,
       event.RequestType
     );
-    // send response to custom resource
-    return sendResponse(event, context.logStreamName, status, responseData);
+    return responseBody(event, context.logStreamName, status, responseData);
   }
 
   /**
    * default
    */
   // send response to custom resource
-  return sendResponse(event, context.logStreamName, "SUCCESS", {
+  return responseBody(event, context.logStreamName, "SUCCESS", {
     Data: "no data",
   });
 };
@@ -163,42 +141,6 @@ const createESRole = async (): Promise<IResponse> => {
     message: `es service linked role created`,
   });
   return { responseData, status };
-};
-
-/**
- * @description send launch data
- * @returns
- */
-const sendData = async (
-  properties: any,
-  requestType: string
-): Promise<IResponse> => {
-  logger.debug({
-    label: "helper/sendData",
-    message: `sending launch data`,
-  });
-  const eventType = `Solution${requestType}`; // SolutionCreate or SolutionDelete
-  const metric = {
-    Solution: properties.SolutionId,
-    UUID: properties.SolutionUuid,
-    TimeStamp: new Date().toISOString().replace("T", " ").replace("Z", ""), // Date and time instant in a java.sql.Timestamp compatible format,
-    Data: {
-      Event: eventType,
-      Stack: properties.Stack,
-      Version: properties.SolutionVersion,
-    },
-  };
-  await Metrics.sendAnonymousMetric(
-    <string>process.env.METRICS_ENDPOINT,
-    metric
-  );
-
-  return {
-    responseData: {
-      Data: metric,
-    },
-    status: "SUCCESS",
-  };
 };
 
 /**
@@ -441,16 +383,8 @@ async function areRegionsValid(regions: string[], awsRegions: string[]) {
   }
 }
 
-/**
- * Sends a response to custom resource
- * for Create/Update/Delete
- * @param {any} event - Custom Resource event
- * @param {string} logStreamName - CloudWatch logs stream
- * @param {string} responseStatus - response status
- * @param {any} responseData - response data
- */
-const sendResponse = async (
-  event: IEvent,
+const responseBody = async (
+  event: CloudFormationCustomResourceEvent,
   logStreamName: string,
   responseStatus: string,
   responseData: any
@@ -458,9 +392,9 @@ const sendResponse = async (
   const responseBody = {
     Status: responseStatus,
     Reason: `${JSON.stringify(responseData)}`,
-    PhysicalResourceId: event.PhysicalResourceId
-      ? event.PhysicalResourceId
-      : logStreamName,
+    PhysicalResourceId:
+      (event as CloudFormationCustomResourceUpdateEvent).PhysicalResourceId ||
+      logStreamName,
     StackId: event.StackId,
     RequestId: event.RequestId,
     LogicalResourceId: event.LogicalResourceId,
@@ -468,7 +402,7 @@ const sendResponse = async (
   };
 
   logger.debug({
-    label: "helper/sendResponse",
+    label: "helper/responseBody",
     message: `Response Body: ${JSON.stringify(responseBody)}`,
   });
 

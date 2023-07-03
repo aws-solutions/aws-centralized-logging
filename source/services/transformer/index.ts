@@ -1,21 +1,11 @@
-/**
- *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
- *  with the License. A copy of the License is located at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  or in the 'license' file accompanying this file. This file is distributed on an 'AS IS' BASIS, WITHOUT WARRANTIES
- *  OR CONDITIONS OF ANY KIND, express or implied. See the License for the specific language governing permissions
- *  and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 import zlib from "zlib";
 import { Firehose } from "aws-sdk";
 import { Record } from "aws-sdk/clients/firehose";
 import { logger } from "logger";
-import { Metrics } from "metric";
+import { sendUsageMetrics } from "metric";
 
 /**
  * @description interface for log event
@@ -164,13 +154,6 @@ function isNumeric(n: any) {
   return !isNaN(parseFloat(n)) && isFinite(n);
 }
 
-/**
- * @description creates records for firehose from the log events
- * @param {ILogEvent} logEvent - log event to transform into es document
- * @param {string} owner - account id of the owner
- * @param {string} logGroup - log group originating the event
- * @param {string} logStream - log stream originating the event
- */
 function createRecordsFromEvents(
   logEvents: ILogEvent[],
   owner: string,
@@ -209,36 +192,12 @@ async function putRecords(records: Record[]) {
   });
   await firehose.putRecordBatch(params).promise();
 
-  // send usage metric to aws-solutions
   if (process.env.SEND_METRIC === "Yes") {
-    logger.info({
-      label: "putRecords",
-      message: `sending metrics for indexed data`,
-    });
-
-    let totalItemSize = 0;
-    records.forEach((r) => {
-      totalItemSize += (r.Data as Buffer).byteLength;
-    });
-    logger.debug({
-      label: "putRecords/sendMetric",
-      message: `totalItemSize: ${totalItemSize}`,
-    });
-
-    const metric = {
-      Solution: <string>process.env.SOLUTION_ID,
-      UUID: <string>process.env.UUID,
-      TimeStamp: new Date().toISOString().replace("T", " ").replace("Z", ""), // Date and time instant in a java.sql.Timestamp compatible format,
-      Data: {
-        TotalItemSize: "" + totalItemSize,
-        Version: <string>process.env.SOLUTION_VERSION,
-        Region: <string>process.env.AWS_REGION,
-      },
-    };
-    await Metrics.sendAnonymousMetric(
-      <string>process.env.METRICS_ENDPOINT,
-      metric
-    );
+    const recordLengths = records.map((it) => (it.Data as Buffer).byteLength);
+    const summedItemSize = recordLengths.reduce((sum, next) => {
+      return sum + next;
+    }, 0);
+    await sendUsageMetrics(summedItemSize);
   }
 }
 

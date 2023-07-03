@@ -1,17 +1,5 @@
-/**
- *  Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- *  Licensed under the Apache License, Version 2.0 (the "License"). You may
- *  not use this file except in compliance with the License. A copy of the
- *  License is located at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  or in the 'license' file accompanying this file. This file is distributed
- *  on an 'AS IS' BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express
- *  or implied. See the License for the specific language governing permissions
- *  and limitations under the License.
- */
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
 
 /**
  * @description
@@ -27,9 +15,15 @@ import {
   SecurityGroup,
   SubnetType,
   Vpc,
-} from "@aws-cdk/aws-ec2";
-import { SnsAction } from "@aws-cdk/aws-cloudwatch-actions";
-import { Code, Runtime, Function, StartingPosition } from "@aws-cdk/aws-lambda";
+} from "aws-cdk-lib/aws-ec2";
+import { SnsAction } from "aws-cdk-lib/aws-cloudwatch-actions";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import {
+  Code,
+  Function,
+  Runtime,
+  StartingPosition,
+} from "aws-cdk-lib/aws-lambda";
 import {
   App,
   Aspects,
@@ -44,12 +38,14 @@ import {
   NestedStack,
   RemovalPolicy,
   Stack,
-} from "@aws-cdk/core";
+  StackProps,
+} from "aws-cdk-lib";
 import {
+  CfnDomain,
   Domain,
   ElasticsearchVersion,
-  CfnDomain,
-} from "@aws-cdk/aws-elasticsearch";
+  TLSSecurityPolicy,
+} from "aws-cdk-lib/aws-elasticsearch";
 import {
   AccountRecovery,
   CfnIdentityPool,
@@ -57,8 +53,9 @@ import {
   CfnUserPool,
   CfnUserPoolUser,
   UserPool,
-} from "@aws-cdk/aws-cognito";
+} from "aws-cdk-lib/aws-cognito";
 import {
+  ArnPrincipal,
   CfnRole,
   Effect,
   FederatedPrincipal,
@@ -67,24 +64,21 @@ import {
   PolicyStatement,
   Role,
   ServicePrincipal,
-  ArnPrincipal,
-} from "@aws-cdk/aws-iam";
-import { Provider } from "@aws-cdk/custom-resources";
-import { StreamEncryption, Stream } from "@aws-cdk/aws-kinesis";
+} from "aws-cdk-lib/aws-iam";
+import { Stream, StreamEncryption } from "aws-cdk-lib/aws-kinesis";
 import {
   BlockPublicAccess,
   Bucket,
-  BucketAccessControl,
   BucketEncryption,
-} from "@aws-cdk/aws-s3";
-import { CfnDeliveryStream } from "@aws-cdk/aws-kinesisfirehose";
-import { LogGroup, LogStream } from "@aws-cdk/aws-logs";
+} from "aws-cdk-lib/aws-s3";
+import { CfnDeliveryStream } from "aws-cdk-lib/aws-kinesisfirehose";
+import { LogGroup, LogStream, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Jumpbox } from "./cl-jumpbox-construct";
-import { KinesisEventSource } from "@aws-cdk/aws-lambda-event-sources";
-import { Queue, QueueEncryption } from "@aws-cdk/aws-sqs";
-import { Topic } from "@aws-cdk/aws-sns";
-import { Alias, IAlias } from "@aws-cdk/aws-kms";
-import { EmailSubscription } from "@aws-cdk/aws-sns-subscriptions";
+import { KinesisEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
+import { Queue, QueueEncryption } from "aws-cdk-lib/aws-sqs";
+import { Topic } from "aws-cdk-lib/aws-sns";
+import { Alias, IAlias } from "aws-cdk-lib/aws-kms";
+import { EmailSubscription } from "aws-cdk-lib/aws-sns-subscriptions";
 import { CLDemo } from "./cl-demo-stack";
 import {
   applyCfnNagSuppressRules,
@@ -94,6 +88,7 @@ import {
 import manifest from "./manifest.json";
 import path from "path";
 import { ResourceRetentionAspect } from "./resource-retention-aspect";
+import { Provider } from "aws-cdk-lib/custom-resources";
 
 enum LogLevel {
   ERROR = "error",
@@ -107,8 +102,8 @@ export class CLPrimary extends Stack {
   readonly region: string;
   readonly partn: string;
 
-  constructor(scope: App, id: string) {
-    super(scope, id);
+  constructor(scope: App, id: string, props?: StackProps) {
+    super(scope, id, props);
 
     const stack = Stack.of(this);
     this.account = stack.account; // Returns the AWS::AccountId for this stack (or the literal value if known)
@@ -153,7 +148,8 @@ export class CLPrimary extends Stack {
      * @type {CfnParameter}
      */
     const demoTemplate: CfnParameter = new CfnParameter(this, "DemoTemplate", {
-      description: "Deploy demo template for sample data and logs?",
+      description:
+        "Deploy demo template for sample data and logs to primary account? If 'yes', make sure to add the primary account ID to the list of spoke account IDs above.",
       type: "String",
       default: "No",
       allowedValues: ["No", "Yes"],
@@ -245,7 +241,7 @@ export class CLPrimary extends Stack {
             default: "Admin Email Address",
           },
           [esDomain.logicalId]: {
-            default: "Elasticsearch Domain Name",
+            default: "OpenSearch Domain Name",
           },
           [jumpboxKey.logicalId]: {
             default: "Key pair for jumpbox",
@@ -260,7 +256,7 @@ export class CLPrimary extends Stack {
             default: "Sample Logs",
           },
           [spokeAccts.logicalId]: {
-            default: "Spoke Accounts",
+            default: "Account IDs",
           },
           [spokeRegions.logicalId]: {
             default: "Spoke Regions",
@@ -367,37 +363,37 @@ export class CLPrimary extends Stack {
       ],
     });
 
-    /**
-     * @description helper lambda
-     * @type {Function}
-     */
-    // eslint-disable-next-line @typescript-eslint/ban-types
-    const helperFunc: Function = new Function(this, "HelperLambda", {
-      description: manifest.solutionName + " -  solution helper functions",
-      environment: {
-        LOG_LEVEL: LogLevel.INFO, //change as needed
-        METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
-        SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
-        CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
-      },
-      handler: "index.handler",
-      code: Code.fromAsset(
-        `${path.dirname(
-          __dirname
-        )}/../services/helper/dist/helper/cl-helper.zip`
-      ),
-      runtime: Runtime.NODEJS_14_X,
-      timeout: Duration.seconds(300),
-      role: helperRole,
-    });
-    applyDependsOn(helperFunc, helperPolicy1);
+    const customResourceHandler: lambda.Function = new lambda.Function(
+      this,
+      "HelperLambda",
+      {
+        description: manifest.solutionName + " -  solution helper functions",
+        environment: {
+          LOG_LEVEL: LogLevel.INFO, //change as needed
+          METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
+          SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
+          CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
+          CLUSTER_SIZE: clusterSize.valueAsString,
+          SOLUTION_ID: manifest.solutionId,
+          SOLUTION_VERSION: manifest.solutionVersion,
+          STACK: "PrimaryStack",
+        },
+        handler: "index.handler",
+        code: Code.fromAsset(
+          `${path.dirname(
+            __dirname
+          )}/../services/helper/dist/helper/cl-helper.zip`
+        ),
+        runtime: Runtime.NODEJS_16_X,
+        timeout: Duration.seconds(300),
+        role: helperRole,
+      }
+    );
+    applyDependsOn(customResourceHandler, helperPolicy1);
 
-    /**
-     * @description custom resource for helper functions
-     * @type {Provider}
-     */
-    const helperProvider: Provider = new Provider(this, "HelperProvider", {
-      onEventHandler: helperFunc,
+    // Wrapping the customResourceHandler in a Provider allows to write simplified code in customResourceHandler
+    const provider: Provider = new Provider(this, "CustomResourceProvider", {
+      onEventHandler: customResourceHandler,
     });
 
     /**
@@ -405,7 +401,7 @@ export class CLPrimary extends Stack {
      */
     const createUniqueId = new CustomResource(this, "CreateUUID", {
       resourceType: "Custom::CreateUUID",
-      serviceToken: helperProvider.serviceToken,
+      serviceToken: provider.serviceToken,
     });
 
     /**
@@ -413,7 +409,7 @@ export class CLPrimary extends Stack {
      */
     new CustomResource(this, "CreateESServiceRole", {
       resourceType: "Custom::CreateESServiceRole",
-      serviceToken: helperProvider.serviceToken,
+      serviceToken: provider.serviceToken,
     });
 
     /**
@@ -421,12 +417,9 @@ export class CLPrimary extends Stack {
      */
     new CustomResource(this, "LaunchData", {
       resourceType: "Custom::LaunchData",
-      serviceToken: helperProvider.serviceToken,
+      serviceToken: provider.serviceToken,
       properties: {
-        SolutionId: manifest.solutionId,
-        SolutionVersion: manifest.solutionVersion,
         SolutionUuid: createUniqueId.getAttString("UUID"),
-        Stack: "PrimaryStack",
       },
     });
 
@@ -640,7 +633,7 @@ export class CLPrimary extends Stack {
      * @type {Domain}
      */
     const domain: Domain = new Domain(this, "ESDomain", {
-      version: ElasticsearchVersion.V7_7,
+      version: ElasticsearchVersion.V7_10,
       domainName: esDomain.valueAsString,
       enforceHttps: true,
       vpc: VPC,
@@ -659,6 +652,7 @@ export class CLPrimary extends Stack {
         role: esCognitoRole,
         userPoolId: esUserPool.userPoolId,
       },
+      tlsSecurityPolicy: TLSSecurityPolicy.TLS_1_2,
     });
 
     // attach policy to idp auth role
@@ -752,30 +746,34 @@ export class CLPrimary extends Stack {
      * @type {Function}
      */
     // eslint-disable-next-line @typescript-eslint/ban-types
-    const logTransformer: Function = new Function(this, "CLTransformer", {
-      description: `${manifest.solutionName} - Lambda function to transform log events and send to kinesis firehose`,
-      environment: {
-        LOG_LEVEL: LogLevel.INFO, //change as needed
-        SOLUTION_ID: manifest.solutionId,
-        SOLUTION_VERSION: manifest.solutionVersion,
-        UUID: createUniqueId.getAttString("UUID"),
-        CLUSTER_SIZE: clusterSize.valueAsString,
-        DELIVERY_STREAM: manifest.firehoseName,
-        METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
-        SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
-        CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
-      },
-      handler: "index.handler",
-      code: Code.fromAsset(
-        `${path.dirname(
-          __dirname
-        )}/../services/transformer/dist/transformer/cl-transformer.zip`
-      ),
-      runtime: Runtime.NODEJS_14_X,
-      timeout: Duration.seconds(300),
-      deadLetterQueue: dlq,
-      deadLetterQueueEnabled: true,
-    });
+    const logTransformer: Function = new lambda.Function(
+      this,
+      "CLTransformer",
+      {
+        description: `${manifest.solutionName} - Lambda function to transform log events and send to kinesis firehose`,
+        environment: {
+          LOG_LEVEL: LogLevel.INFO, //change as needed
+          SOLUTION_ID: manifest.solutionId,
+          SOLUTION_VERSION: manifest.solutionVersion,
+          UUID: createUniqueId.getAttString("UUID"),
+          CLUSTER_SIZE: clusterSize.valueAsString,
+          DELIVERY_STREAM: manifest.firehoseName,
+          METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
+          SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
+          CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
+        },
+        handler: "index.handler",
+        code: Code.fromAsset(
+          `${path.dirname(
+            __dirname
+          )}/../services/transformer/dist/transformer/cl-transformer.zip`
+        ),
+        runtime: Runtime.NODEJS_16_X,
+        timeout: Duration.seconds(300),
+        deadLetterQueue: dlq,
+        deadLetterQueueEnabled: true,
+      }
+    );
 
     /**
      * @description Kms key for SNS topic
@@ -832,8 +830,8 @@ export class CLPrimary extends Stack {
      */
     const accessLogsBucket: Bucket = new Bucket(this, "AccessLogsBucket", {
       encryption: BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
-      accessControl: BucketAccessControl.LOG_DELIVERY_WRITE,
     });
 
     /**
@@ -842,6 +840,7 @@ export class CLPrimary extends Stack {
      */
     const firehoseBucket: Bucket = new Bucket(this, "CLBucket", {
       encryption: BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       serverAccessLogsBucket: accessLogsBucket,
       serverAccessLogsPrefix: "cl-access-logs",
@@ -861,10 +860,14 @@ export class CLPrimary extends Stack {
      * @description log group for firehose error events
      * @type {LogGroup}
      */
-    const firehoseLG: LogGroup = new LogGroup(this, "FirehoseLogGroup", {
-      removalPolicy: RemovalPolicy.RETAIN,
-      logGroupName: `/aws/kinesisfirehose/${manifest.firehoseName}`,
-    });
+    const firehoseLG: LogGroup = new LogGroup(
+      this,
+      `${manifest.firehoseName}-FirehoseLogGroup`,
+      {
+        removalPolicy: RemovalPolicy.RETAIN,
+        retention: RetentionDays.ONE_YEAR,
+      }
+    );
 
     /**
      * @description log stream for elasticsearch delivery logs
@@ -1111,7 +1114,7 @@ export class CLPrimary extends Stack {
       "CWDestination",
       {
         resourceType: "Custom::CWDestination",
-        serviceToken: helperProvider.serviceToken,
+        serviceToken: provider.serviceToken,
         properties: {
           Regions: spokeRegions.valueAsList,
           DestinationName: `${
@@ -1125,10 +1128,6 @@ export class CLPrimary extends Stack {
     );
     applyDependsOn(cwDestination, helperPolicy2);
 
-    /**
-     * @description Jumpbox resources
-     * @type {Construct}
-     */
     new Jumpbox(this, "CL-Jumpbox", {
       vpc: VPC,
       subnets: VPC.publicSubnets,
@@ -1161,14 +1160,13 @@ export class CLPrimary extends Stack {
       cfn_suppress_rules.W12,
     ]);
 
-    applyCfnNagSuppressRules(helperFunc.node.defaultChild as CfnResource, [
-      cfn_suppress_rules.W58,
-      cfn_suppress_rules.W89,
-      cfn_suppress_rules.W92,
-    ]);
+    applyCfnNagSuppressRules(
+      customResourceHandler.node.defaultChild as CfnResource,
+      [cfn_suppress_rules.W58, cfn_suppress_rules.W89, cfn_suppress_rules.W92]
+    );
 
     applyCfnNagSuppressRules(
-      helperProvider.node.children[0].node.findChild("Resource") as CfnResource,
+      provider.node.children[0].node.findChild("Resource") as CfnResource,
       [cfn_suppress_rules.W58, cfn_suppress_rules.W89, cfn_suppress_rules.W92]
     );
 
