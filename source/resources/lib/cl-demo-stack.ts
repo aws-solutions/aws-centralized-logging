@@ -16,7 +16,7 @@ import {
   NestedStack,
   NestedStackProps,
   RemovalPolicy,
-  Stack
+  Stack,
 } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import {
@@ -25,12 +25,25 @@ import {
   FlowLogResourceType,
   FlowLogTrafficType,
   SubnetType,
-  Vpc
+  Vpc,
 } from "aws-cdk-lib/aws-ec2";
-import { Effect, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
-import { CfnSubscriptionFilter, LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import {
+  Effect,
+  PolicyStatement,
+  Role,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
+import {
+  CfnSubscriptionFilter,
+  LogGroup,
+  RetentionDays,
+} from "aws-cdk-lib/aws-logs";
 import { Trail } from "aws-cdk-lib/aws-cloudtrail";
-import { BlockPublicAccess, Bucket, BucketEncryption } from "aws-cdk-lib/aws-s3";
+import {
+  BlockPublicAccess,
+  Bucket,
+  BucketEncryption,
+} from "aws-cdk-lib/aws-s3";
 import { EC2Demo } from "./cl-demo-ec2-construct";
 import { applyCfnNagSuppressRules, cfn_suppress_rules } from "./utils";
 import manifest from "./manifest.json";

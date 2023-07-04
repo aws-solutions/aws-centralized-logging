@@ -1,0 +1,19 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - node -v
+      - npm -v
+      - cd source/resources
+      - npm ci
+  build:
+    commands:
+      - npm run cdk-bootstrap
+      - npm run cdk-synth
+artifacts:
+  files:
+    - "**/*"
+  base-directory: source/resources/cdk.out

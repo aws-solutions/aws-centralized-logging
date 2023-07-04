@@ -1,10 +1,10 @@
 {
   "solutionId": "SO0009",
   "metricsEndpoint": "https://metrics.awssolutionsbuilder.com/generic",
-  "solutionName": "%%SOLUTION_NAME%%",
+  "solutionName": "centralized-logging",
   "templateVersion": "2010-09-09",
-  "solutionVersion": "%%VERSION%%",
-  "sendMetric": "Yes",
+  "solutionVersion": "v4.0.2-solunion",
+  "sendMetric": "No",
   "streamName": "CL-KinesisStream",
   "firehoseName": "CL-Firehose",
   "cwDestinationName": "CL-Destination",
@@ -17,5 +17,6 @@
   "kinesisDataStream": {
     "shard": 1,
     "retentionInHrs": 24
-  }
+  },
+  "retentionEnabled": false
 }

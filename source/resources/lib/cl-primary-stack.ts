@@ -25,6 +25,7 @@ import {
   StartingPosition,
 } from "aws-cdk-lib/aws-lambda";
 import {
+  Aws,
   App,
   Aspects,
   CfnCondition,
@@ -140,7 +141,7 @@ export class CLPrimary extends Stack {
         "Elasticsearch cluster size; small (4 data nodes), medium (6 data nodes), large (6 data nodes)",
       type: "String",
       default: "Small",
-      allowedValues: ["Small", "Medium", "Large"],
+      allowedValues: ["ExtraSmall", "Small", "Medium", "Large"],
     });
 
     /**
@@ -200,6 +201,16 @@ export class CLPrimary extends Stack {
         "Key pair name for jumpbox (You may leave this empty if you chose 'No' above)",
       type: "String",
     });
+
+    /**
+     * @description the master user for the cognito domain
+     * @type {CfnParameter}
+     */
+    // const masterUserARN: CfnParameter = new CfnParameter(this, "MasterUserARN", {
+    //   description:
+    //     "The ARN of the master user",
+    //   type: "String",
+    // });
 
     //=============================================================================================
     // Metadata
@@ -281,17 +292,26 @@ export class CLPrimary extends Stack {
 
     const esMap = new CfnMapping(this, "ESMap", {
       mapping: {
+        MasterCount: {
+          ExtraSmall: 0,
+          Small: manifest.esdomain.masterNodes,
+          Medium: manifest.esdomain.masterNodes,
+          Large: manifest.esdomain.masterNodes,
+        },
         NodeCount: {
+          ExtraSmall: 1,
           Small: 4,
           Medium: 6,
           Large: 6,
         },
         MasterSize: {
+          ExtraSmall: "t3.small.elasticsearch",
           Small: "c5.large.elasticsearch",
           Medium: "c5.large.elasticsearch",
           Large: "c5.large.elasticsearch",
         },
         InstanceSize: {
+          ExtraSmall: "t3.small.elasticsearch",
           Small: "r5.large.elasticsearch",
           Medium: "r5.2xlarge.elasticsearch",
           Large: "r5.4xlarge.elasticsearch",
@@ -310,6 +330,15 @@ export class CLPrimary extends Stack {
       "JumpboxDeploymentCheck",
       {
         expression: Fn.conditionEquals(jumpboxDeploy.valueAsString, "Yes"),
+      }
+    );
+    const highAvailabilityCheck = new CfnCondition(
+      this,
+      "HighAvailabilityCheck",
+      {
+        expression: Fn.conditionNot(
+          Fn.conditionEquals(clusterSize.valueAsString, "ExtraSmall")
+        ),
       }
     );
 
@@ -569,7 +598,9 @@ export class CLPrimary extends Stack {
      * @type {LogGroup}
      */
     const flowLg: LogGroup = new LogGroup(this, "VPCFlowLogGroup", {
-      removalPolicy: RemovalPolicy.RETAIN,
+      removalPolicy: manifest.retentionEnabled
+        ? RemovalPolicy.RETAIN
+        : RemovalPolicy.DESTROY,
     });
 
     /**
@@ -606,7 +637,9 @@ export class CLPrimary extends Stack {
         },
       ],
     });
-    Aspects.of(VPC).add(new ResourceRetentionAspect());
+    if (manifest.retentionEnabled) {
+      Aspects.of(VPC).add(new ResourceRetentionAspect());
+    }
 
     /**
      * @description security group for es domain
@@ -626,7 +659,9 @@ export class CLPrimary extends Stack {
       Port.tcp(443),
       "allow outbound https"
     );
-    Aspects.of(esSg).add(new ResourceRetentionAspect());
+    if (manifest.retentionEnabled) {
+      Aspects.of(esSg).add(new ResourceRetentionAspect());
+    }
 
     /**
      * @description es domain
@@ -642,9 +677,9 @@ export class CLPrimary extends Stack {
       encryptionAtRest: {
         enabled: true,
       },
-      zoneAwareness: {
-        availabilityZoneCount: 2,
-      },
+      // zoneAwareness: {
+      //   availabilityZoneCount: 2,
+      // },
       nodeToNodeEncryption: true,
       automatedSnapshotStartHour: 0,
       cognitoKibanaAuth: {
@@ -680,15 +715,33 @@ export class CLPrimary extends Stack {
      * @remark property is not supported on higher level construct
      */
     const clusterConfig = {
-      DedicatedMasterEnabled: true,
-      InstanceCount: esMap.findInMap("NodeCount", clusterSize.valueAsString),
-      ZoneAwarenessEnabled: true,
-      InstanceType: esMap.findInMap("InstanceSize", clusterSize.valueAsString),
-      DedicatedMasterType: esMap.findInMap(
-        "MasterSize",
-        clusterSize.valueAsString
+      DedicatedMasterEnabled: Fn.conditionIf(
+        highAvailabilityCheck.logicalId,
+        true,
+        false
       ),
-      DedicatedMasterCount: 3,
+      InstanceCount: esMap.findInMap("NodeCount", clusterSize.valueAsString),
+      ZoneAwarenessEnabled: Fn.conditionIf(
+        highAvailabilityCheck.logicalId,
+        true,
+        false
+      ),
+      ZoneAwarenessConfig: Fn.conditionIf(
+        highAvailabilityCheck.logicalId,
+        { AvailabilityZoneCount: 2 },
+        Aws.NO_VALUE
+      ),
+      InstanceType: esMap.findInMap("InstanceSize", clusterSize.valueAsString),
+      DedicatedMasterType: Fn.conditionIf(
+        highAvailabilityCheck.logicalId,
+        esMap.findInMap("MasterSize", clusterSize.valueAsString),
+        Aws.NO_VALUE
+      ),
+      DedicatedMasterCount: Fn.conditionIf(
+        highAvailabilityCheck.logicalId,
+        esMap.findInMap("MasterCount", clusterSize.valueAsString),
+        Aws.NO_VALUE
+      ),
     };
     // adding cluster config
     applyDependsOn(domain, upDomain);
@@ -732,6 +785,15 @@ export class CLPrimary extends Stack {
     };
     // adding access policy
     cfnDomain.addPropertyOverride("AccessPolicies", accessPolicies);
+
+    // MasterUer
+    // const advancedSecurityOptions = {
+    //     Enabled: true,
+    //     MasterUserOptions: {
+    //       MasterUserARN: masterUserARN.valueAsString,
+    //   }
+    // }
+    // cfnDomain.addPropertyOverride("AdvancedSecurityOptions", advancedSecurityOptions);
 
     /**
      * @description dead letter queue for lambda
@@ -855,7 +917,10 @@ export class CLPrimary extends Stack {
       })
     );
     // apply retention policy
-    Aspects.of(firehoseBucket).add(new ResourceRetentionAspect());
+    if (manifest.retentionEnabled) {
+      Aspects.of(firehoseBucket).add(new ResourceRetentionAspect());
+    }
+
     /**
      * @description log group for firehose error events
      * @type {LogGroup}
@@ -864,7 +929,9 @@ export class CLPrimary extends Stack {
       this,
       `${manifest.firehoseName}-FirehoseLogGroup`,
       {
-        removalPolicy: RemovalPolicy.RETAIN,
+        removalPolicy: manifest.retentionEnabled
+          ? RemovalPolicy.RETAIN
+          : RemovalPolicy.DESTROY,
         retention: RetentionDays.ONE_YEAR,
       }
     );
@@ -1246,6 +1313,11 @@ export class CLPrimary extends Stack {
       value: `https://${domain.domainEndpoint}/_plugin/kibana/`,
     });
 
+    new CfnOutput(this, "ES Domain Url", {
+      description: "ElasticSearch URL",
+      value: `https://${domain.domainEndpoint}`,
+    });
+
     new CfnOutput(this, "Cluster Size", {
       description: "ES Cluster Size",
       value: clusterSize.valueAsString,
@@ -1254,6 +1326,16 @@ export class CLPrimary extends Stack {
     new CfnOutput(this, "Demo Deployment", {
       description: "Demo data deployed?",
       value: demoTemplate.valueAsString,
+    });
+
+    new CfnOutput(this, "CognitoUserPoolId", {
+      description: "Cognito UserPool ID",
+      value: esUserPool.userPoolId,
+    });
+
+    new CfnOutput(this, "CognitoIdentityPoolId", {
+      description: "Cognito Identity Pool ID",
+      value: identityPool.ref,
     });
   }
 }
