@@ -156,6 +156,7 @@ export class EC2Demo extends Construct {
       init: init,
       allowAllOutbound: true,
       securityGroup: demoSg,
+      requireImdsv2: true,
     });
 
     demoEC2.addUserData(

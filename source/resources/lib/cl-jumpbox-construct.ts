@@ -90,6 +90,7 @@ export class Jumpbox extends Construct {
       securityGroup: sg,
       vpcSubnets: { subnets: props.subnets },
       keyName: props.keyname,
+      requireImdsv2: true,
     });
     (jumpbox.node.defaultChild as CfnResource).cfnOptions.condition =
       props.deploy;

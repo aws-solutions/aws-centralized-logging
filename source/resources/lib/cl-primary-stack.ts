@@ -273,7 +273,7 @@ export class CLPrimary extends Stack {
     const metricsMap = new CfnMapping(this, "CLMap", {
       mapping: {
         Metric: {
-          SendAnonymousMetric: manifest.sendMetric,
+          SendAnonymizedMetric: manifest.sendMetric,
           MetricsEndpoint: manifest.metricsEndpoint, // aws-solutions metrics endpoint
         },
       },
@@ -371,7 +371,7 @@ export class CLPrimary extends Stack {
         environment: {
           LOG_LEVEL: LogLevel.INFO, //change as needed
           METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
-          SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
+          SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymizedMetric"),
           CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
           CLUSTER_SIZE: clusterSize.valueAsString,
           SOLUTION_ID: manifest.solutionId,
@@ -759,7 +759,7 @@ export class CLPrimary extends Stack {
           CLUSTER_SIZE: clusterSize.valueAsString,
           DELIVERY_STREAM: manifest.firehoseName,
           METRICS_ENDPOINT: metricsMap.findInMap("Metric", "MetricsEndpoint"),
-          SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymousMetric"),
+          SEND_METRIC: metricsMap.findInMap("Metric", "SendAnonymizedMetric"),
           CUSTOM_SDK_USER_AGENT: `AwsSolution/${manifest.solutionId}/${manifest.solutionVersion}`,
         },
         handler: "index.handler",
