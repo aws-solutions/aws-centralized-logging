@@ -20,6 +20,9 @@ source/services/@aws-solutions/utils/*/index.js
 
 # Node dependencies
 node_modules
+*.js
+!jest.config.js
+*.d.ts
 
 # CDK asset staging directory
 .cdk.staging
@@ -28,3 +31,6 @@ __snapshots__
 
 # Misc
 .DS_Store
+
+# IDEs
+.idea
