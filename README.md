@@ -2,6 +2,10 @@
 
 _Note:_ For any relevant information outside the scope of this readme, please refer to the solution landing page and implementation guide.
 
+**Centralized Logging on AWS will be deprecated on March 1, 2024. It is being superseded by the [Centralized Logging with OpenSearch](https://aws.amazon.com/solutions/implementations/centralized-logging-with-opensearch/) (CLOS) solution. After deprecation, all existing deployments will continue to work but the solution will no longer be supported and maintained. If you’re not using GovCloud region deployments, we highly recommend migrating to version 2.0.0 or newer of the CLOS solution by following the steps outlined in the [Centralized Logging on AWS](https://docs.aws.amazon.com/solutions/latest/centralized-logging-on-aws/migrate-to-new-solution.html) implementation guide.**
+
+
+
 **[🚀Solution Landing Page](https://aws.amazon.com/solutions/implementations/centralized-logging/)** | **[🚧Feature request](https://github.com/aws-solutions/aws-centralized-logging/issues/new?assignees=&labels=feature-request%2C+enhancement&template=feature_request.md&title=)** | **[🐛Bug Report](https://github.com/aws-solutions/aws-centralized-logging/issues/new?assignees=&labels=bug%2C+triage&template=bug_report.md&title=)** | **[📜Documentation Improvement](https://github.com/aws-solutions/aws-centralized-logging/issues/new?assignees=&labels=document-update&template=documentation_improvements.md&title=)**
 
 ## Table of content

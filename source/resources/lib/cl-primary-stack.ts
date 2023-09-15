@@ -384,7 +384,7 @@ export class CLPrimary extends Stack {
             __dirname
           )}/../services/helper/dist/helper/cl-helper.zip`
         ),
-        runtime: Runtime.NODEJS_16_X,
+        runtime: Runtime.NODEJS_18_X,
         timeout: Duration.seconds(300),
         role: helperRole,
       }
@@ -768,7 +768,7 @@ export class CLPrimary extends Stack {
             __dirname
           )}/../services/transformer/dist/transformer/cl-transformer.zip`
         ),
-        runtime: Runtime.NODEJS_16_X,
+        runtime: Runtime.NODEJS_18_X,
         timeout: Duration.seconds(300),
         deadLetterQueue: dlq,
         deadLetterQueueEnabled: true,
@@ -828,7 +828,7 @@ export class CLPrimary extends Stack {
      * @description S3 bucket for access logs
      * @type {Bucket}
      */
-    const accessLogsBucket: Bucket = new Bucket(this, "AccessLogsBucket", {
+    const accessLogsBucket: Bucket = new Bucket(this, "AccessLogsBucket", { //NOSONAR
       encryption: BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
@@ -838,7 +838,7 @@ export class CLPrimary extends Stack {
      * @description S3 bucket for Firehose
      * @type {Bucket}
      */
-    const firehoseBucket: Bucket = new Bucket(this, "CLBucket", {
+    const firehoseBucket: Bucket = new Bucket(this, "CLBucket", { //NOSONAR
       encryption: BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,

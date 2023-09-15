@@ -135,7 +135,7 @@ export class CLDemo extends NestedStack {
      * @type {Vpc}
      */
     const demoVPC: Vpc = new Vpc(this, "DemoVPC", {
-      cidr: "10.0.1.0/26",
+      cidr: "10.0.1.0/26", //NOSONAR
       natGateways: 0,
       vpnGateway: false,
       subnetConfiguration: [
@@ -217,7 +217,7 @@ export class CLDemo extends NestedStack {
      * @description bucket for CloudTrail
      * @type {Bucket}
      */
-    const trailBucket: Bucket = new Bucket(this, "TrailBucket", {
+    const trailBucket: Bucket = new Bucket(this, "TrailBucket", { //NOSONAR
       encryption: BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
