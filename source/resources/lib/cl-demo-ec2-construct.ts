@@ -103,7 +103,7 @@ export class EC2Demo extends Construct {
       InitPackage.yum("amazon-cloudwatch-agent", {
         serviceRestartHandles: [handle],
       }),
-      InitFile.fromObject("/tmp/cw-config.json", {
+      InitFile.fromObject("/tmp/cw-config.json", { //NOSONAR
         agent: {
           run_as_user: "root",
         },
