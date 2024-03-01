@@ -1,12 +1,5 @@
 # Centralized Logging on AWS Solution
-
-_Note:_ For any relevant information outside the scope of this readme, please refer to the solution landing page and implementation guide.
-
-**Centralized Logging on AWS will be deprecated on March 1, 2024. It is being superseded by the [Centralized Logging with OpenSearch](https://aws.amazon.com/solutions/implementations/centralized-logging-with-opensearch/) (CLOS) solution. After deprecation, all existing deployments will continue to work but the solution will no longer be supported and maintained. If you’re not using GovCloud region deployments, we highly recommend migrating to version 2.0.0 or newer of the CLOS solution by following the steps outlined in the [Centralized Logging on AWS](https://docs.aws.amazon.com/solutions/latest/centralized-logging-on-aws/migrate-to-new-solution.html) implementation guide.**
-
-
-
-**[🚀Solution Landing Page](https://aws.amazon.com/solutions/implementations/centralized-logging/)** | **[🚧Feature request](https://github.com/aws-solutions/aws-centralized-logging/issues/new?assignees=&labels=feature-request%2C+enhancement&template=feature_request.md&title=)** | **[🐛Bug Report](https://github.com/aws-solutions/aws-centralized-logging/issues/new?assignees=&labels=bug%2C+triage&template=bug_report.md&title=)** | **[📜Documentation Improvement](https://github.com/aws-solutions/aws-centralized-logging/issues/new?assignees=&labels=document-update&template=documentation_improvements.md&title=)**
+**Centralized Logging on AWS has been superseded by the Centralized Logging with OpenSearch [Centralized Logging with OpenSearch](https://aws.amazon.com/solutions/implementations/centralized-logging-with-opensearch/) solution. All existing deployments will continue to work but the solution will no longer be supported and maintained.**
 
 ## Table of content
 
@@ -43,12 +36,6 @@ The Centralized Logging on AWS solution contains the following components: **log
 
 <img src="./architecture.png" width="750" height="500">
 
-## Installing pre-packaged solution template
-
-- Primary Template: [aws-centralized-logging.template](https://solutions-reference.s3.amazonaws.com/centralized-logging/latest/aws-centralized-logging.template)
-
-- Demo Template: [Demo.template](https://solutions-reference.s3.amazonaws.com/centralized-logging/latest/aws-centralized-logging-demo.template)
-
 ## Customization
 
 - Prerequisite: Node.js>=16 | npm >= 8
@@ -71,8 +58,6 @@ You may make any needed change as per your requirement. If you want to customize
 "solutionVersion": "%%VERSION%%", #provide a valid value eg. v1.0
 "sendMetric": "Yes",
 ```
-
-Additionally, you can customize the code and add any extension to the solution. Please review our [feature request guidelines](./.github/ISSUE_TEMPLATE/feature_request.md), if you want to submit a PR.
 
 ### Unit Test
 
@@ -157,9 +142,6 @@ Centralized Logging on AWS solution consists of:
 
 See license [here](./LICENSE.txt)
 
-## Collection of operational metrics
-
-This solution collects anonymized operational metrics to help AWS improve the quality and features of the solution. For more information, including how to disable this capability, please see the [implementation guide](https://docs.aws.amazon.com/solutions/latest/centralized-logging/collection-of-operational-metrics.html).
 
 ---
 
